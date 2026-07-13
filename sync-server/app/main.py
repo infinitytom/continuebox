@@ -66,6 +66,8 @@ def startup():
           server_updated_at INTEGER NOT NULL,
           deleted INTEGER NOT NULL DEFAULT 0,
           device_id TEXT NOT NULL,
+          data_json TEXT NOT NULL DEFAULT '',
+          progress_key TEXT NOT NULL DEFAULT '',
           PRIMARY KEY(user_id, record_key),
           FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         );
@@ -84,6 +86,8 @@ def startup():
         columns = {r["name"] for r in conn.execute("PRAGMA table_info(records)")}
         if "data_json" not in columns:
             conn.execute("ALTER TABLE records ADD COLUMN data_json TEXT NOT NULL DEFAULT ''")
+        if "progress_key" not in columns:
+            conn.execute("ALTER TABLE records ADD COLUMN progress_key TEXT NOT NULL DEFAULT ''")
         # Existing installations predate the change journal. Seed each stored record once
         # so a newly upgraded client receives a complete initial snapshot.
         conn.execute("""INSERT INTO sync_changes(user_id, record_key, server_updated_at)
@@ -149,6 +153,7 @@ class Record(BaseModel):
     updated_at: int = Field(gt=0)
     deleted: bool = False
     data_json: str = Field(default="", max_length=1000000)
+    progress_key: str = Field(default="", max_length=2000)
 
     @field_validator("updated_at")
     @classmethod
@@ -207,15 +212,18 @@ def push(body: PushBody, user_id: int = Depends(current_user)):
             # write makes delayed requests unable to overwrite a newer server value.
             if old and old["client_updated_at"] >= item.updated_at:
                 continue
-            conn.execute("""INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            conn.execute("""INSERT INTO records(user_id,record_key,source_key,video_id,video_name,episode_id,
+              episode_name,position_ms,duration_ms,client_updated_at,server_updated_at,deleted,device_id,data_json,progress_key)
+              VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
               ON CONFLICT(user_id,record_key) DO UPDATE SET
               video_name=excluded.video_name, episode_name=excluded.episode_name,
               position_ms=excluded.position_ms, duration_ms=excluded.duration_ms,
               client_updated_at=excluded.client_updated_at, server_updated_at=excluded.server_updated_at,
-              deleted=excluded.deleted, device_id=excluded.device_id, data_json=excluded.data_json""",
+              deleted=excluded.deleted, device_id=excluded.device_id, data_json=excluded.data_json,
+              progress_key=excluded.progress_key""",
               (user_id, key, item.source_key, item.video_id, item.video_name, item.episode_id,
                item.episode_name, item.position_ms, item.duration_ms, item.updated_at, now,
-               int(item.deleted), body.device_id, item.data_json))
+               int(item.deleted), body.device_id, item.data_json, item.progress_key))
             conn.execute("INSERT INTO sync_changes(user_id,record_key,server_updated_at) VALUES(?,?,?)",
                          (user_id, key, now))
             accepted += 1
@@ -231,7 +239,7 @@ def pull(since: int = Query(default=0, ge=0), limit: int = Query(default=500, ge
          user_id: int = Depends(current_user)):
     with db() as conn:
         rows = conn.execute("""SELECT source_key,video_id,video_name,episode_id,episode_name,
-          position_ms,duration_ms,client_updated_at,deleted,device_id,server_updated_at,data_json
+          position_ms,duration_ms,client_updated_at,deleted,device_id,server_updated_at,data_json,progress_key
           FROM records WHERE user_id=? AND server_updated_at>? ORDER BY server_updated_at LIMIT ?""",
           (user_id, since, limit)).fetchall()
     records = [dict(r) | {"deleted": bool(r["deleted"]), "updated_at": r["client_updated_at"]} for r in rows]
@@ -254,7 +262,7 @@ def pull_v2(after: int = Query(default=0, ge=0), limit: int = Query(default=500,
     with db() as conn:
         events = conn.execute("""SELECT c.sequence, r.source_key,r.video_id,r.video_name,r.episode_id,
           r.episode_name,r.position_ms,r.duration_ms,r.client_updated_at,r.deleted,r.device_id,
-          r.server_updated_at,r.data_json
+          r.server_updated_at,r.data_json,r.progress_key
           FROM sync_changes c LEFT JOIN records r
             ON r.user_id=c.user_id AND r.record_key=c.record_key
           WHERE c.user_id=? AND c.sequence>? ORDER BY c.sequence LIMIT ?""",

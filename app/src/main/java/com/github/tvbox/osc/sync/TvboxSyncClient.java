@@ -2,9 +2,11 @@ package com.github.tvbox.osc.sync;
 
 import android.os.AsyncTask;
 
+import com.github.tvbox.osc.cache.CacheManager;
 import com.github.tvbox.osc.cache.RoomDataManger;
 import com.github.tvbox.osc.cache.VodRecord;
 import com.github.tvbox.osc.data.AppDataManager;
+import com.github.tvbox.osc.util.MD5;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -12,7 +14,9 @@ import com.google.gson.JsonParser;
 import com.orhanobut.hawk.Hawk;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -40,6 +44,9 @@ public final class TvboxSyncClient {
     private static final String RETRY_AT = "sync_retry_at";
     private static final String RETRY_COUNT = "sync_retry_count";
     private static final Object OUTBOX_LOCK = new Object();
+    // Avoid sending an identical paused frame every few seconds, while keeping the
+    // latest moving playback position as a new logical update.
+    private static final Map<String, String> LAST_QUEUED_STATE = new HashMap<>();
     private static final AtomicBoolean PUSHING = new AtomicBoolean(false);
     private static final AtomicBoolean PULLING = new AtomicBoolean(false);
     private static volatile boolean pullAfterPush;
@@ -117,7 +124,8 @@ public final class TvboxSyncClient {
                                     item.get("source_key").getAsString(), item.get("video_id").getAsString(),
                                     string(item, "video_name"), string(item, "episode_id"),
                                     string(item, "episode_name"), item.get("updated_at").getAsLong(),
-                                    string(item, "data_json"));
+                                    string(item, "data_json"), longValue(item, "position_ms"),
+                                    string(item, "progress_key"));
                         } catch (Exception ignoredRecord) { }
                     }
                     if (result.has("cursor")) nextCursor = result.get("cursor").getAsLong();
@@ -136,7 +144,15 @@ public final class TvboxSyncClient {
             if (item == null) return;
             synchronized (OUTBOX_LOCK) {
                 JsonObject pending = outbox();
-                pending.add(recordKey(item), item); // keep only the newest snapshot of each episode
+                String key = recordKey(item);
+                String state = string(item, "episode_id") + "|" + longValue(item, "position_ms");
+                // A regular history record's updateTime does not change as the player
+                // advances. Give each changed playback position a fresh logical time;
+                // otherwise the server quite correctly rejects it as an old snapshot.
+                if (state.equals(LAST_QUEUED_STATE.get(key)) && !pending.has(key)) return;
+                item.addProperty("updated_at", Math.max(record.updateTime, System.currentTimeMillis()));
+                LAST_QUEUED_STATE.put(key, state);
+                pending.add(key, item); // keep only the newest snapshot of each episode
                 saveOutbox(pending);
             }
         } catch (Exception ignored) { }
@@ -192,14 +208,20 @@ public final class TvboxSyncClient {
 
     private static JsonObject recordItem(VodRecord record) {
         JsonObject vod = new JsonParser().parse(record.dataJson).getAsJsonObject();
+        String playFlag = string(vod, "playFlag");
+        int playIndex = intValue(vod, "playIndex");
+        String episodeName = string(vod, "playNote");
+        // PlayFragment stores progress outside VodInfo, keyed by this exact string.
+        String progressKey = record.sourceKey + record.vodId + playFlag + playIndex + episodeName;
         JsonObject item = new JsonObject();
         item.addProperty("source_key", record.sourceKey);
         item.addProperty("video_id", record.vodId);
         item.addProperty("video_name", string(vod, "name"));
-        item.addProperty("episode_id", vod.has("playFlag") ? vod.get("playFlag").getAsString() + "#" + vod.get("playIndex").getAsInt() : "");
-        item.addProperty("episode_name", string(vod, "playNote"));
-        item.addProperty("position_ms", vod.has("playPosition") ? vod.get("playPosition").getAsLong() : 0);
-        item.addProperty("duration_ms", vod.has("playDuration") ? vod.get("playDuration").getAsLong() : 0);
+        item.addProperty("episode_id", playFlag.isEmpty() ? "" : playFlag + "#" + playIndex);
+        item.addProperty("episode_name", episodeName);
+        item.addProperty("position_ms", cachedProgress(progressKey));
+        item.addProperty("duration_ms", 0);
+        item.addProperty("progress_key", progressKey);
         item.addProperty("updated_at", record.updateTime);
         item.addProperty("deleted", false); item.addProperty("data_json", record.dataJson);
         return item;
@@ -216,7 +238,17 @@ public final class TvboxSyncClient {
     private static String value(String key) { return value(key, ""); }
     private static String value(String key, String fallback) { Object value = Hawk.get(key, fallback); return value == null ? fallback : value.toString(); }
     private static long longValue(String key, long fallback) { try { return Long.parseLong(value(key, String.valueOf(fallback))); } catch (Exception ignored) { return fallback; } }
+    private static long longValue(JsonObject object, String key) { try { return object.has(key) ? object.get(key).getAsLong() : 0L; } catch (Exception ignored) { return 0L; } }
+    private static int intValue(JsonObject object, String key) { try { return object.has(key) ? object.get(key).getAsInt() : 0; } catch (Exception ignored) { return 0; } }
     private static String string(JsonObject object, String key) { return object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsString() : ""; }
+    private static long cachedProgress(String progressKey) {
+        try {
+            Object cached = CacheManager.getCache(MD5.string2MD5(progressKey));
+            if (cached instanceof Number) return Math.max(0L, ((Number) cached).longValue());
+            if (cached != null) return Math.max(0L, Long.parseLong(cached.toString()));
+        } catch (Exception ignored) { }
+        return 0L;
+    }
     private static String deviceId() { String id = value("sync_device"); if (id.isEmpty()) { id = UUID.randomUUID().toString(); Hawk.put("sync_device", id); } return id; }
     private static void done(Callback callback, boolean success) { if (callback != null) callback.complete(success); }
 }

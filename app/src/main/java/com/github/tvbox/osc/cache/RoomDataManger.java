@@ -10,6 +10,7 @@ import com.github.tvbox.osc.sync.TvboxSyncClient;
 import com.google.gson.ExclusionStrategy;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.HistoryHelper;
+import com.github.tvbox.osc.util.MD5;
 import com.google.gson.FieldAttributes;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -60,16 +61,25 @@ public class RoomDataManger {
         TvboxSyncClient.push(record);
     }
 
-    public static void upsertSyncedRecord(String sourceKey, String vodId, String name, String episodeId, String episodeName, long updatedAt, String dataJson) {
+    public static void upsertSyncedRecord(String sourceKey, String vodId, String name, String episodeId, String episodeName, long updatedAt, String dataJson, long positionMs, String progressKey) {
         if (sourceKey == null || vodId == null || sourceKey.isEmpty() || vodId.isEmpty()) return;
         VodRecord old = AppDataManager.get().getVodRecordDao().getVodRecord(sourceKey, vodId);
         if (old != null && old.updateTime > updatedAt) return;
         VodInfo info = !TextUtils.isEmpty(dataJson) ? getVodInfoGson().fromJson(dataJson, new TypeToken<VodInfo>(){}.getType()) : (old != null && !TextUtils.isEmpty(old.dataJson) ? getVodInfoGson().fromJson(old.dataJson, new TypeToken<VodInfo>(){}.getType()) : new VodInfo());
         info.sourceKey = sourceKey; info.id = vodId; if (TextUtils.isEmpty(info.name)) info.name = name;
-        info.playFlag = episodeId; info.playNote = episodeName;
+        int separator = episodeId == null ? -1 : episodeId.lastIndexOf('#');
+        if (separator > 0) {
+            info.playFlag = episodeId.substring(0, separator);
+            try { info.playIndex = Integer.parseInt(episodeId.substring(separator + 1)); } catch (Exception ignored) { }
+        }
+        info.playNote = episodeName;
         VodRecord record = old == null ? new VodRecord() : old;
         record.sourceKey = sourceKey; record.vodId = vodId; record.updateTime = updatedAt; record.dataJson = getVodInfoGson().toJson(info);
         AppDataManager.get().getVodRecordDao().insert(record);
+        if (positionMs > 0) {
+            String key = TextUtils.isEmpty(progressKey) ? sourceKey + vodId + info.playFlag + info.playIndex + info.playNote : progressKey;
+            CacheManager.save(MD5.string2MD5(key), positionMs);
+        }
     }
 
     public static VodInfo getVodInfo(String sourceKey, String vodId) {

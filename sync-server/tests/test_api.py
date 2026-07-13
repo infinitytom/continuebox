@@ -18,13 +18,24 @@ def test_register_push_pull(tmp_path):
             "device_id": "living-room",
             "records": [{"source_key": "same-source", "video_id": "v1", "episode_id": "e1",
                          "video_name": "测试", "position_ms": 12000, "duration_ms": 60000,
-                         "updated_at": 1700000000000}]
+                         "progress_key": "same-sourcev1e1Episode 1", "updated_at": 1700000000000}]
         })
         assert pushed.status_code == 200
         assert pushed.json()["accepted"] == 1
         pulled = client.get("/api/v1/sync/pull?since=0", headers=headers)
         assert pulled.status_code == 200
         assert pulled.json()["records"][0]["position_ms"] == 12000
+        assert pulled.json()["records"][0]["progress_key"] == "same-sourcev1e1Episode 1"
+
+        # Progress frames for the same episode are newer logical updates, not retries.
+        advanced = client.post("/api/v1/sync/push", headers=headers, json={
+            "device_id": "living-room",
+            "records": [{"source_key": "same-source", "video_id": "v1", "episode_id": "e1",
+                         "position_ms": 24000, "updated_at": 1700000005000}]
+        })
+        assert advanced.json()["accepted"] == 1
+        latest = client.get("/api/v1/sync/pull-v2?after=0", headers=headers).json()["records"][-1]
+        assert latest["position_ms"] == 24000
 
 
 def test_sequence_cursor_returns_writes_with_same_server_time(tmp_path):
