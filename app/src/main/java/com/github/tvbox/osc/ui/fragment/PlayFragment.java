@@ -1000,6 +1000,7 @@ public class PlayFragment extends BaseLazyFragment {
     public void onPause() {
         super.onPause();
         TvboxSyncClient.pushLatest();
+        TvboxSyncClient.setPlaybackActive(false);
         if (mVideoView != null && !exitingPreview) {
             mVideoView.pause();
         }
@@ -1031,6 +1032,7 @@ public class PlayFragment extends BaseLazyFragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        TvboxSyncClient.setPlaybackActive(false);
         ApiConfig.get().setCurrentPlaySourceKey("");
         cancelPlayTimeout();
         EventBus.getDefault().unregister(this);
@@ -1339,6 +1341,7 @@ public class PlayFragment extends BaseLazyFragment {
 
         stopParse();
         playbackStarted = false;
+        TvboxSyncClient.setPlaybackActive(false);
         playTimeoutBasePosition = 0;
         webPlayUrl = null;
         webHeaderMap = null;
@@ -1610,6 +1613,7 @@ public class PlayFragment extends BaseLazyFragment {
 
     void markPlaybackStarted() {
         playbackStarted = true;
+        TvboxSyncClient.setPlaybackActive(true);
         cancelPlayTimeout();
     }
 

@@ -73,8 +73,9 @@ public class App extends MultiDexApplication {
         final Runnable sync = new Runnable() {
             @Override public void run() {
                 try {
-                    Activity current = getCurrentActivity();
-                    boolean playing = current != null && current.getClass().getSimpleName().contains("PlayActivity");
+                    // Vod playback lives in DetailActivity, not a PlayActivity. Let the
+                    // player report its state so the five-second sync loop actually runs.
+                    boolean playing = TvboxSyncClient.playbackActive();
                     if (playing) {
                         TvboxSyncClient.pushLatest();
                         // Upload stays responsive; periodically pull changes made on other devices too.

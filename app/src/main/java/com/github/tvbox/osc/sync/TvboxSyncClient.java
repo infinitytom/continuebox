@@ -49,6 +49,7 @@ public final class TvboxSyncClient {
     private static final Map<String, String> LAST_QUEUED_STATE = new HashMap<>();
     private static final AtomicBoolean PUSHING = new AtomicBoolean(false);
     private static final AtomicBoolean PULLING = new AtomicBoolean(false);
+    private static final AtomicBoolean PLAYBACK_ACTIVE = new AtomicBoolean(false);
     private static volatile boolean pullAfterPush;
     private static final OkHttpClient HTTP = new OkHttpClient.Builder()
             .connectTimeout(4, TimeUnit.SECONDS)
@@ -62,6 +63,10 @@ public final class TvboxSyncClient {
     public static boolean enabled() {
         return !value("sync_endpoint").trim().isEmpty() && !value("sync_token").trim().isEmpty();
     }
+
+    /** The player reports its real state; activity names are not a reliable signal. */
+    public static void setPlaybackActive(boolean active) { PLAYBACK_ACTIVE.set(active); }
+    public static boolean playbackActive() { return PLAYBACK_ACTIVE.get(); }
 
     /** Queues the latest local record before attempting delivery. */
     public static void pushLatest() {
