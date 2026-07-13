@@ -69,7 +69,6 @@ public class App extends MultiDexApplication {
     private void startSyncLoop() {
         final Handler handler = new Handler(Looper.getMainLooper());
         final boolean[] wasPlaying = {false};
-        final int[] playingTicks = {0};
         final Runnable sync = new Runnable() {
             @Override public void run() {
                 try {
@@ -78,12 +77,12 @@ public class App extends MultiDexApplication {
                     boolean playing = TvboxSyncClient.playbackActive();
                     if (playing) {
                         TvboxSyncClient.pushLatest();
-                        // Upload stays responsive; periodically pull changes made on other devices too.
-                        if (++playingTicks[0] % 3 == 0) TvboxSyncClient.pull();
+                        // Keep both directions on the same five-second cadence so a
+                        // second device sees a newly uploaded position promptly.
+                        TvboxSyncClient.pull();
                     } else if (wasPlaying[0]) {
                         TvboxSyncClient.pushLatest();
                         handler.postDelayed(() -> TvboxSyncClient.pull(), 1500L);
-                        playingTicks[0] = 0;
                     }
                     wasPlaying[0] = playing;
                 } catch (Throwable ignored) { }

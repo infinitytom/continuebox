@@ -151,6 +151,9 @@ public class DetailActivity extends BaseActivity {
     protected void init() {
         EventBus.getDefault().register(this);
         TvboxSyncClient.pull();
+        // A write from another device can arrive just after the first request.
+        // Recheck once after the detail screen has finished initializing.
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> TvboxSyncClient.pull(), 2500L);
         initView();
         initViewModel();
         initData();
