@@ -71,10 +71,25 @@ def startup():
         );
         CREATE INDEX IF NOT EXISTS idx_records_changes
           ON records(user_id, server_updated_at);
+        CREATE TABLE IF NOT EXISTS sync_changes (
+          sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          record_key TEXT NOT NULL,
+          server_updated_at INTEGER NOT NULL,
+          FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_sync_changes_cursor
+          ON sync_changes(user_id, sequence);
         """)
         columns = {r["name"] for r in conn.execute("PRAGMA table_info(records)")}
         if "data_json" not in columns:
             conn.execute("ALTER TABLE records ADD COLUMN data_json TEXT NOT NULL DEFAULT ''")
+        # Existing installations predate the change journal. Seed each stored record once
+        # so a newly upgraded client receives a complete initial snapshot.
+        conn.execute("""INSERT INTO sync_changes(user_id, record_key, server_updated_at)
+                        SELECT r.user_id, r.record_key, r.server_updated_at FROM records r
+                        WHERE NOT EXISTS (SELECT 1 FROM sync_changes c
+                                          WHERE c.user_id=r.user_id AND c.record_key=r.record_key)""")
 
 
 def b64(data: bytes) -> str:
@@ -188,7 +203,9 @@ def push(body: PushBody, user_id: int = Depends(current_user)):
             key = item.key()
             old = conn.execute("SELECT client_updated_at FROM records WHERE user_id=? AND record_key=?",
                                (user_id, key)).fetchone()
-            if old and old["client_updated_at"] > item.updated_at:
+            # Equal timestamps are retries of the same local snapshot. Keeping the first
+            # write makes delayed requests unable to overwrite a newer server value.
+            if old and old["client_updated_at"] >= item.updated_at:
                 continue
             conn.execute("""INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
               ON CONFLICT(user_id,record_key) DO UPDATE SET
@@ -199,6 +216,8 @@ def push(body: PushBody, user_id: int = Depends(current_user)):
               (user_id, key, item.source_key, item.video_id, item.video_name, item.episode_id,
                item.episode_name, item.position_ms, item.duration_ms, item.updated_at, now,
                int(item.deleted), body.device_id, item.data_json))
+            conn.execute("INSERT INTO sync_changes(user_id,record_key,server_updated_at) VALUES(?,?,?)",
+                         (user_id, key, now))
             accepted += 1
         conn.execute("""DELETE FROM records WHERE user_id=? AND record_key NOT IN
           (SELECT record_key FROM records WHERE user_id=? ORDER BY server_updated_at DESC LIMIT ?)""",
@@ -221,3 +240,36 @@ def pull(since: int = Query(default=0, ge=0), limit: int = Query(default=500, ge
     cursor = max((r["server_updated_at"] for r in rows), default=since)
     logger.info("pull user=%s since=%s returned=%s cursor=%s", user_id, since, len(records), cursor)
     return {"records": records, "cursor": cursor, "has_more": len(rows) == limit}
+
+
+@app.get("/api/v1/sync/pull-v2")
+def pull_v2(after: int = Query(default=0, ge=0), limit: int = Query(default=500, ge=1, le=1000),
+            user_id: int = Depends(current_user)):
+    """Sequence-cursor pull for upgraded clients.
+
+    SQLite's autoincrement sequence is strictly ordered, unlike millisecond clock
+    timestamps. That means two devices writing in the same millisecond cannot make
+    another device permanently skip one of the records.
+    """
+    with db() as conn:
+        events = conn.execute("""SELECT c.sequence, r.source_key,r.video_id,r.video_name,r.episode_id,
+          r.episode_name,r.position_ms,r.duration_ms,r.client_updated_at,r.deleted,r.device_id,
+          r.server_updated_at,r.data_json
+          FROM sync_changes c LEFT JOIN records r
+            ON r.user_id=c.user_id AND r.record_key=c.record_key
+          WHERE c.user_id=? AND c.sequence>? ORDER BY c.sequence LIMIT ?""",
+          (user_id, after, limit)).fetchall()
+    records = []
+    for event in events:
+        # A retention cleanup may have removed the old record after its journal entry.
+        # Still advancing the sequence cursor prevents a client from being stuck on it.
+        if event["source_key"] is None:
+            continue
+        record = dict(event)
+        del record["sequence"]
+        record["deleted"] = bool(record["deleted"])
+        record["updated_at"] = record.pop("client_updated_at")
+        records.append(record)
+    cursor = max((event["sequence"] for event in events), default=after)
+    logger.info("pull-v2 user=%s after=%s returned=%s cursor=%s", user_id, after, len(records), cursor)
+    return {"records": records, "cursor": cursor, "has_more": len(events) == limit}
