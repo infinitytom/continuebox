@@ -19,6 +19,8 @@ jobs:
           java-version: '17'
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
+      - name: Configure Android SDK path
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
       - name: Build Android APK
         run: ./gradlew :app:assembleJava64Debug --no-daemon
       - name: Package NAS server
