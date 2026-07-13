@@ -1,0 +1,30 @@
+name: Release ContinueBox
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build Android APK
+        run: ./gradlew :app:assembleJava64Debug --no-daemon
+      - name: Package NAS server
+        run: zip -r ContinueBox-sync-server.zip sync-server -x 'sync-server/.env' 'sync-server/data/*' '__pycache__/*'
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            app/build/outputs/apk/java64/debug/ContinueBox_debug-java64.apk
+            ContinueBox-sync-server.zip
