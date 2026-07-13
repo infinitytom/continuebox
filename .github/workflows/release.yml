@@ -17,6 +17,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
       - name: Build Android APK
         run: ./gradlew :app:assembleJava64Debug --no-daemon
       - name: Package NAS server
