@@ -82,7 +82,7 @@ public class App extends MultiDexApplication {
                     }
                     wasPlaying[0] = playing;
                 } catch (Throwable ignored) { }
-                handler.postDelayed(this, 15 * 1000L);
+                handler.postDelayed(this, 5 * 1000L);
             }
         };
         handler.post(sync);

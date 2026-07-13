@@ -29,7 +29,8 @@ public class HomeHotVodAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHol
     public HomeHotVodAdapter(ImgUtil.Style style, String tvRate) {
         super(R.layout.item_user_hot_vod, new ArrayList<>());
         if (style != null) {
-            this.defaultWidth = ImgUtil.getStyleDefaultWidth(style);
+            // Keep the user-page recommendation rail compact so sync controls remain visible on TV screens.
+            this.defaultWidth = Math.round(ImgUtil.getStyleDefaultWidth(style) * 0.75f);
         }
         this.style = style;
         this.tvRateValue = tvRate;
