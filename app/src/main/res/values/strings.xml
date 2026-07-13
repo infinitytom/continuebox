@@ -1,0 +1,11 @@
+<resources>
+    <!--  app名称   -->
+    <string name="app_name">续映 ContinueBox</string>
+    <string name="_00_00_00_00">00:00 | 00:00</string>
+    <string name="_1024_x_768">[ 1024 x 768 ]</string>
+    <string name="http">http://</string>
+    <string name="_00_00_00">00:00:00</string>
+    <string name="_0kb_s">0Kb/s</string>
+    <string name="_more_">更 多</string>
+    <string name="_00_00">00:00</string>
+</resources>

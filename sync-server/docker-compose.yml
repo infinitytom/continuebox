@@ -1,0 +1,16 @@
+services:
+  tvbox-sync:
+    build: .
+    image: tvbox-sync:local
+    container_name: tvbox-sync
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /data
+      TOKEN_SECRET: ${TOKEN_SECRET:?请在.env中设置TOKEN_SECRET}
+      TOKEN_DAYS: ${TOKEN_DAYS:-30}
+      ALLOW_REGISTER: ${ALLOW_REGISTER:-true}
+      MAX_RECORDS: ${MAX_RECORDS:-30}
+    volumes:
+      - ./data:/data
+    ports:
+      - "${PORT:-8080}:8080"
