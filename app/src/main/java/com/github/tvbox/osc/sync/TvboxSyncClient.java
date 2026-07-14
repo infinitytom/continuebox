@@ -43,7 +43,9 @@ public final class TvboxSyncClient {
     private static final String CURSOR = "sync_cursor_v2";
     private static final String RETRY_AT = "sync_retry_at";
     private static final String RETRY_COUNT = "sync_retry_count";
+    private static final String LOCAL_HISTORY_ACCOUNT = "sync_local_history_account";
     private static final Object OUTBOX_LOCK = new Object();
+    private static final Object ACCOUNT_SWITCH_LOCK = new Object();
     // Avoid sending an identical paused frame every few seconds, while keeping the
     // latest moving playback position as a new logical update.
     private static final Map<String, String> LAST_QUEUED_STATE = new HashMap<>();
@@ -108,6 +110,7 @@ public final class TvboxSyncClient {
 
     private static void startPull(final Callback callback) {
         if (!PULLING.compareAndSet(false, true)) { pullAgain = true; done(callback, false); return; }
+        ensureLocalHistoryAccount();
         final String endpoint = endpoint();
         final String token = value("sync_token").trim();
         final String account = accountId();
@@ -255,6 +258,15 @@ public final class TvboxSyncClient {
     private static String endpoint() { return value("sync_endpoint").trim().replaceAll("/$", ""); }
     private static String accountId() { return MD5.string2MD5(endpoint().toLowerCase() + "\u0000" + value("sync_account_name").trim().toLowerCase()); }
     private static String accountKey(String base, String account) { return base + "_" + account; }
+    private static void ensureLocalHistoryAccount() {
+        String account = accountId();
+        synchronized (ACCOUNT_SWITCH_LOCK) {
+            if (account.equals(value(LOCAL_HISTORY_ACCOUNT))) return;
+            RoomDataManger.deleteVodRecordAll();
+            Hawk.put(accountKey(CURSOR, account), "0");
+            Hawk.put(LOCAL_HISTORY_ACCOUNT, account);
+        }
+    }
     private static String value(String key) { return value(key, ""); }
     private static String value(String key, String fallback) { Object value = Hawk.get(key, fallback); return value == null ? fallback : value.toString(); }
     private static long longValue(String key, long fallback) { try { return Long.parseLong(value(key, String.valueOf(fallback))); } catch (Exception ignored) { return fallback; } }
