@@ -51,6 +51,7 @@ public final class TvboxSyncClient {
     private static final AtomicBoolean PULLING = new AtomicBoolean(false);
     private static final AtomicBoolean PLAYBACK_ACTIVE = new AtomicBoolean(false);
     private static volatile boolean pullAfterPush;
+    private static volatile boolean pullAgain;
     private static final OkHttpClient HTTP = new OkHttpClient.Builder()
             .connectTimeout(4, TimeUnit.SECONDS)
             .readTimeout(8, TimeUnit.SECONDS)
@@ -87,7 +88,8 @@ public final class TvboxSyncClient {
 
     /** Replays every unsent record when the app starts or returns to foreground. */
     public static void retryPending() {
-        if (Hawk.get(DIRTY, false) || !outbox().entrySet().isEmpty()) drainOutbox(true);
+        String account = accountId();
+        if (Hawk.get(accountKey(DIRTY, account), false) || !outbox(account).entrySet().isEmpty()) drainOutbox(true);
     }
 
     public static void pull() { pull(null); }
@@ -105,10 +107,12 @@ public final class TvboxSyncClient {
     }
 
     private static void startPull(final Callback callback) {
-        if (!PULLING.compareAndSet(false, true)) { done(callback, false); return; }
+        if (!PULLING.compareAndSet(false, true)) { pullAgain = true; done(callback, false); return; }
         final String endpoint = endpoint();
         final String token = value("sync_token").trim();
-        final long cursor = longValue(CURSOR, 0L);
+        final String account = accountId();
+        final String cursorKey = accountKey(CURSOR, account);
+        final long cursor = longValue(cursorKey, 0L);
         AsyncTask.execute(() -> {
             boolean success = false;
             long nextCursor = cursor;
@@ -137,9 +141,10 @@ public final class TvboxSyncClient {
                     success = true;
                 }
             } catch (Exception ignored) { }
-            if (success) Hawk.put(CURSOR, String.valueOf(nextCursor));
+            if (success) Hawk.put(cursorKey, String.valueOf(nextCursor));
             PULLING.set(false);
             done(callback, success);
+            if (pullAgain) { pullAgain = false; startPull(null); }
         });
     }
 
@@ -147,24 +152,32 @@ public final class TvboxSyncClient {
         try {
             JsonObject item = recordItem(record);
             if (item == null) return;
+            String account = accountId();
             synchronized (OUTBOX_LOCK) {
-                JsonObject pending = outbox();
+                JsonObject pending = outbox(account);
                 String key = recordKey(item);
                 String state = string(item, "episode_id") + "|" + longValue(item, "position_ms");
                 // A regular history record's updateTime does not change as the player
                 // advances. Give each changed playback position a fresh logical time;
                 // otherwise the server quite correctly rejects it as an old snapshot.
-                if (state.equals(LAST_QUEUED_STATE.get(key)) && !pending.has(key)) return;
+                String stateKey = account + "\u0000" + key;
+                if (state.equals(LAST_QUEUED_STATE.get(stateKey)) && !pending.has(key)) return;
                 item.addProperty("updated_at", Math.max(record.updateTime, System.currentTimeMillis()));
-                LAST_QUEUED_STATE.put(key, state);
+                LAST_QUEUED_STATE.put(stateKey, state);
                 pending.add(key, item); // keep only the newest snapshot of each episode
-                saveOutbox(pending);
+                saveOutbox(account, pending);
             }
         } catch (Exception ignored) { }
     }
 
     private static void drainOutbox(boolean force) {
-        if (!enabled() || (!force && System.currentTimeMillis() < longValue(RETRY_AT, 0L))) return;
+        if (!enabled()) return;
+        final String account = accountId();
+        final String retryAtKey = accountKey(RETRY_AT, account);
+        final String retryCountKey = accountKey(RETRY_COUNT, account);
+        final String pushEndpoint = endpoint();
+        final String pushToken = value("sync_token").trim();
+        if (!force && System.currentTimeMillis() < longValue(retryAtKey, 0L)) return;
         if (!PUSHING.compareAndSet(false, true)) return;
         AsyncTask.execute(() -> {
             boolean sent = false;
@@ -174,7 +187,7 @@ public final class TvboxSyncClient {
                     JsonArray batch = new JsonArray();
                     List<String> keys = new ArrayList<>();
                     synchronized (OUTBOX_LOCK) {
-                        pending = outbox();
+                        pending = outbox(account);
                         for (String key : pending.keySet()) {
                             if (keys.size() == 100) break;
                             keys.add(key); batch.add(pending.get(key));
@@ -183,28 +196,28 @@ public final class TvboxSyncClient {
                     if (keys.isEmpty()) { sent = true; break; }
                     JsonObject body = new JsonObject();
                     body.addProperty("device_id", deviceId()); body.add("records", batch);
-                    Request request = new Request.Builder().url(endpoint() + "/api/v1/sync/push")
-                            .addHeader("Authorization", "Bearer " + value("sync_token").trim())
+                    Request request = new Request.Builder().url(pushEndpoint + "/api/v1/sync/push")
+                            .addHeader("Authorization", "Bearer " + pushToken)
                             .post(RequestBody.create(JSON, body.toString())).build();
                     try (Response response = HTTP.newCall(request).execute()) {
                         if (!response.isSuccessful()) throw new Exception("push failed");
                     }
                     synchronized (OUTBOX_LOCK) {
-                        JsonObject latest = outbox();
+                        JsonObject latest = outbox(account);
                         for (String key : keys) {
                             // Do not erase a newer snapshot queued while this request was in flight.
                             if (latest.has(key) && pending.has(key) && latest.get(key).equals(pending.get(key))) latest.remove(key);
                         }
-                        saveOutbox(latest);
+                        saveOutbox(account, latest);
                     }
                 }
             } catch (Exception ignored) { }
             if (sent) {
-                Hawk.put(RETRY_COUNT, 0); Hawk.put(RETRY_AT, 0L);
+                Hawk.put(retryCountKey, 0); Hawk.put(retryAtKey, 0L);
             } else {
-                int attempt = Math.min(6, (int) longValue(RETRY_COUNT, 0L) + 1);
-                Hawk.put(RETRY_COUNT, attempt);
-                Hawk.put(RETRY_AT, System.currentTimeMillis() + (1000L << attempt)); // 2s … 64s
+                int attempt = Math.min(6, (int) longValue(retryCountKey, 0L) + 1);
+                Hawk.put(retryCountKey, attempt);
+                Hawk.put(retryAtKey, System.currentTimeMillis() + (1000L << attempt)); // 2s … 64s
             }
             PUSHING.set(false);
             if (pullAfterPush && !hasPending()) { pullAfterPush = false; startPull(null); }
@@ -232,14 +245,16 @@ public final class TvboxSyncClient {
         return item;
     }
 
-    private static boolean hasPending() { synchronized (OUTBOX_LOCK) { return !outbox().entrySet().isEmpty(); } }
-    private static JsonObject outbox() {
-        try { return new JsonParser().parse(value(OUTBOX, "{}")).getAsJsonObject(); }
+    private static boolean hasPending() { String account=accountId(); synchronized (OUTBOX_LOCK) { return !outbox(account).entrySet().isEmpty(); } }
+    private static JsonObject outbox(String account) {
+        try { return new JsonParser().parse(value(accountKey(OUTBOX, account), "{}")).getAsJsonObject(); }
         catch (Exception ignored) { return new JsonObject(); }
     }
-    private static void saveOutbox(JsonObject pending) { Hawk.put(OUTBOX, pending.toString()); Hawk.put(DIRTY, !pending.entrySet().isEmpty()); }
+    private static void saveOutbox(String account, JsonObject pending) { Hawk.put(accountKey(OUTBOX, account), pending.toString()); Hawk.put(accountKey(DIRTY, account), !pending.entrySet().isEmpty()); }
     private static String recordKey(JsonObject item) { return string(item, "source_key") + "\u0000" + string(item, "video_id") + "\u0000" + string(item, "episode_id"); }
     private static String endpoint() { return value("sync_endpoint").trim().replaceAll("/$", ""); }
+    private static String accountId() { return MD5.string2MD5(endpoint().toLowerCase() + "\u0000" + value("sync_account_name").trim().toLowerCase()); }
+    private static String accountKey(String base, String account) { return base + "_" + account; }
     private static String value(String key) { return value(key, ""); }
     private static String value(String key, String fallback) { Object value = Hawk.get(key, fallback); return value == null ? fallback : value.toString(); }
     private static long longValue(String key, long fallback) { try { return Long.parseLong(value(key, String.valueOf(fallback))); } catch (Exception ignored) { return fallback; } }
