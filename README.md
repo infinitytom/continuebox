@@ -87,4 +87,4 @@ python -m pytest -q
 - [ ] 增加 HTTPS、反向代理和数据库备份恢复指引。
 - [ ] 发布正式签名安装包，并完善版本更新与迁移流程。
 ## 友情链接
-- linux.do 中文geek社区
+- <linux.do> 中文geek社区
