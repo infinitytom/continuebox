@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>续映 · 服务管理</title>
+<style>
+:root{color-scheme:dark;--bg:#0b111b;--panel:#141e2d;--line:#29374a;--text:#edf3fa;--muted:#93a5ba;--blue:#85baff;--green:#8fdec2}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 0 0,#1a3451,transparent 60%),var(--bg);color:var(--text);font:15px/1.6 system-ui,"Microsoft YaHei",sans-serif}button,input{font:inherit}button{cursor:pointer}button:disabled{opacity:.5;cursor:wait}button,input{border:1px solid var(--line);border-radius:12px;padding:11px 15px;background:#0c1522;color:var(--text)}button:hover{border-color:var(--blue)}button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:3px}input{width:100%;margin-top:7px}label{display:block;color:var(--muted);margin:17px 0}.primary{background:var(--blue);color:#081324;font-weight:700;border:0}.shell{max-width:1240px;margin:auto;padding:36px 28px}header{display:flex;align-items:center;justify-content:space-between;gap:20px}.brand{font-size:22px;font-weight:700;letter-spacing:2px}.mark{display:inline-grid;place-items:center;background:var(--blue);color:#0c1522;width:38px;height:38px;border-radius:12px;margin-right:12px}.sub,.muted{color:var(--muted)}.eyebrow{color:var(--green);font-size:12px;letter-spacing:2px}.hero{margin:44px 0 26px}h1{font-size:36px;line-height:1.3;margin:8px 0}h2{font-size:20px;margin:0 0 18px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px}.login{max-width:440px;margin:55px auto}.login h1{font-size:28px}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px}.metric{padding:22px}.metric strong{display:block;font-size:32px;margin-top:8px}.grid{display:grid;grid-template-columns:1.5fr 1fr;gap:22px}.full{grid-column:1/-1}table{border-collapse:collapse;width:100%;text-align:left}th,td{border-bottom:1px solid var(--line);padding:13px 8px}th{color:var(--muted);font-weight:500}.scroll{overflow:auto}.badge{display:inline-block;background:#183a32;color:var(--green);padding:3px 10px;border-radius:20px;font-size:12px}.off{background:#473421;color:#ffd294}.limits{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}.row{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}.notice{min-height:24px;color:#ffd294;white-space:pre-wrap;margin:16px 0}.hidden,[hidden]{display:none!important}.actions{display:flex;gap:10px;flex-wrap:wrap}footer{margin-top:28px;color:var(--muted);font-size:12px}#auth button{width:100%}@media(max-width:850px){.grid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}.shell{padding:22px 16px}h1{font-size:28px}.panel{padding:20px}}
+</style>
+<div class="shell">
+<header><div class="brand"><span class="mark">C</span>续映 <span class="sub">/ 服务管理</span></div><div class="actions" id="toolbar" hidden><button id="refresh">刷新</button><button id="signout">退出管理</button></div></header>
+<div id="notice" class="notice" role="status" aria-live="polite"></div>
+<section id="auth" class="panel login"><div class="eyebrow">CONTINUEBOX</div><h1>让每一次观看<br>接续如初。</h1><p class="muted">登录管理员账号，查看服务状态与安全设置。</p>
+<form id="login"><label>账号 / 邮箱<input id="username" autocomplete="username" required maxlength="254"></label><label>密码<input id="password" type="password" autocomplete="current-password" required maxlength="128"></label><button class="primary">进入管理台</button></form></section>
+<main id="main" hidden><div class="hero"><div class="eyebrow">服务概览</div><h1>一切接续，有迹可循。</h1><p class="muted" id="status"></p></div>
+<div class="cards" id="metrics"></div><div class="grid">
+<section class="panel"><h2>账号与设备</h2><p class="muted">解除登录会保留账号、观看历史和收藏。旧客户端需升级后才能逐台管理设备。</p><div class="scroll"><table><thead><tr><th>账号</th><th>邮箱</th><th>设备</th><th>操作</th></tr></thead><tbody id="users"></tbody></table></div><div class="actions" style="margin-top:16px"><button id="prev">上一页</button><button id="next">下一页</button></div></section>
+<section class="panel"><h2>注册与访问保护</h2><p class="muted">注册保持开放，必须完成邮箱验证。每日额度按北京时间重置。</p><form id="limits"><div class="limits" id="fields"></div><button class="primary">保存额度</button></form></section>
+<section class="panel"><h2>服务连接</h2><div id="integrations"></div></section>
+<section class="panel"><h2>近期安全事件</h2><div id="events"></div></section>
+<section class="panel full" id="device-panel" hidden><h2 id="device-heading">已登录设备</h2><div id="device-list"></div><button id="close-devices" style="margin-top:16px">收起设备</button></section>
+<section class="panel full"><h2>本地弹幕管理</h2><p class="muted">查看最近 100 条本地弹幕。移除本地弹幕不会删除弹弹play平台上的内容。</p><div class="scroll"><table><thead><tr><th>发送账号</th><th>弹幕内容</th><th>发送时间</th><th>操作</th></tr></thead><tbody id="comments"></tbody></table></div></section>
+</div></main><footer>ContinueBox · 管理会话仅保存在当前页面内存中 · 刷新页面需重新登录</footer></div>
+<script>
+'use strict';
+let token='',offset=0,loading=false;
+const $=id=>document.getElementById(id);
+const labels={register_daily:'每日注册总量',register_ip_daily:'每 IP 每日注册',mail_daily:'每日邮件总量',mail_ip_daily:'每 IP 每日邮件',mail_email_daily:'每邮箱每日邮件',login_15min:'15 分钟登录次数',requests_minute:'每 IP 每分钟请求',requests_global_minute:'全站每分钟请求',auth_global_minute:'全站每分钟认证请求',danmaku_minute:'每账号每分钟弹幕',danmaku_daily:'每账号每日弹幕'};
+const events={register:'注册账号',login:'登录',revoke_device:'解除设备登录',logout:'退出登录',logout_all:'退出所有设备',admin_logout_all:'管理员解除全部登录',bind_email:'绑定邮箱',update_limits:'更新安全额度',delete_account:'注销账号'};
+function notice(text){$('notice').textContent=text}
+function randomId(){return Array.from(crypto.getRandomValues(new Uint8Array(16)),x=>x.toString(16).padStart(2,'0')).join('')}
+function node(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n}
+async function api(path,method='GET',body){const r=await fetch(path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{})});const data=await r.json();if(!r.ok){if(r.status===401&&token)exit();throw Error(typeof data.detail==='string'?data.detail:'请求未完成，请检查输入')}return data}
+function exit(){token='';$('main').hidden=true;$('toolbar').hidden=true;$('auth').hidden=false;$('password').value='';$('users').replaceChildren();$('events').replaceChildren()}
+async function run(fn){if(loading)return;loading=true;document.querySelectorAll('button').forEach(b=>b.disabled=true);notice('');try{await fn()}catch(e){notice(e.message)}finally{loading=false;document.querySelectorAll('button').forEach(b=>b.disabled=false)}}
+async function users(){
+const d=await api('/api/v1/admin/users?offset='+offset);$('users').replaceChildren();
+for(const u of d.users){
+const tr=node('tr');tr.append(node('td',u.username),node('td',u.email||'待绑定'),node('td',String(u.devices)));
+const td=node('td'),button=node('button','解除全部登录'),manage=node('button','查看设备');
+button.onclick=()=>run(async()=>{if(!confirm('解除 '+u.username+' 的全部设备登录？账号和数据会保留。'))return;await api('/api/v1/admin/users/'+u.id+'/logout-all','POST',{});await load();notice('已解除登录')});
+manage.onclick=()=>run(()=>devices(u));td.append(manage,button);tr.append(td);$('users').append(tr)}}
+async function devices(user){
+const d=await api('/api/v1/admin/users/'+user.id+'/devices');$('device-heading').textContent=user.username+' · 已登录设备';$('device-list').replaceChildren();$('device-panel').hidden=false;
+if(!d.devices.length)$('device-list').append(node('p','暂无可识别的新版本设备','muted'));
+for(const device of d.devices){const row=node('div',undefined,'row'),button=node('button','解除登录');row.append(node('span',device.name),node('span','最近活动 '+new Date(device.last_seen*1000).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}),'muted'));button.onclick=()=>run(async()=>{if(!confirm('解除 '+device.name+' 的登录？账号和同步数据会保留。'))return;await api('/api/v1/admin/users/'+user.id+'/devices/'+device.id,'DELETE');await devices(user);await users();notice('设备登录已解除')});row.append(button);$('device-list').append(row)}
+$('device-panel').scrollIntoView({behavior:'smooth',block:'center'})}
+async function moderation(){
+const d=await api('/api/v1/admin/danmaku');$('comments').replaceChildren();
+for(const comment of d.comments){const tr=node('tr'),td=node('td'),remove=node('button','移除本地弹幕');tr.append(node('td',comment.username),node('td',comment.text),node('td',new Date(comment.created_at*1000).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})));remove.onclick=()=>run(async()=>{if(!confirm('永久移除这条本地弹幕？弹弹play平台上的内容不会被删除。'))return;await api('/api/v1/admin/danmaku/'+comment.id,'DELETE');await moderation();notice('本地弹幕已移除')});td.append(remove);tr.append(td);$('comments').append(tr)}}
+async function load(){const d=await api('/api/v1/admin/overview');$('auth').hidden=true;$('main').hidden=false;$('toolbar').hidden=false;$('status').textContent='服务 v'+d.stats.version+' · 邮件验证'+(d.mail_ready?'已配置':'待配置')+' · 今日注册 '+d.today_registered+'/'+d.limits.register_daily;$('metrics').replaceChildren();for(const [label,value]of [['账号',d.stats.users],['已登录设备',d.active_devices],['观看记录',d.stats.history],['今日验证邮件',d.today_mail]]){const card=node('div',undefined,'panel metric');card.append(node('span',label,'muted'),node('strong',String(value)));$('metrics').append(card)}
+$('fields').replaceChildren();for(const [key,label]of Object.entries(labels)){const field=node('label',label),input=node('input');input.type='number';input.min='1';input.max='10000';input.required=true;input.value=d.limits[key];input.dataset.key=key;field.append(input);$('fields').append(field)}
+$('integrations').replaceChildren();for(const [name,ready]of Object.entries({...d.stats.integrations,smtp:d.mail_ready})){const row=node('div',undefined,'row');row.append(node('span',name.toUpperCase()),node('span',ready?'已配置':'待配置','badge'+(ready?'':' off')));$('integrations').append(row)}
+$('events').replaceChildren();for(const e of d.events.slice(0,12)){const row=node('div',undefined,'row');row.append(node('span',(events[e.event]||e.event)+(e.target?' · 账号 #'+e.target:'')),node('span',new Date(e.created_at*1000).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}),'muted'));$('events').append(row)}await users();await moderation()}
+$('login').onsubmit=e=>{e.preventDefault();run(async()=>{const d=await api('/api/v1/auth/login','POST',{username:$('username').value.trim(),password:$('password').value,device_id:'admin-'+randomId(),device_name:'服务管理台'});token=d.token;$('password').value='';try{await load()}catch(err){await api('/api/v1/account/logout','POST',{});exit();throw err}})};
+$('refresh').onclick=()=>run(load);$('close-devices').onclick=()=>{$('device-panel').hidden=true};$('signout').onclick=()=>run(async()=>{try{await api('/api/v1/account/logout','POST',{})}finally{exit()}});
+$('limits').onsubmit=e=>{e.preventDefault();run(async()=>{const body={};$('fields').querySelectorAll('input').forEach(i=>body[i.dataset.key]=Number(i.value));await api('/api/v1/admin/limits','PUT',body);notice('安全额度已保存')})};
+$('next').onclick=()=>run(async()=>{offset+=100;await users();await moderation()});$('prev').onclick=()=>run(async()=>{offset=Math.max(0,offset-100);await users();await moderation()});
+</script></html>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:orientation="vertical" android:background="@color/cb_background" android:padding="14.0dp" android:layout_width="match_parent" android:layout_height="match_parent">
+  <TextView android:textSize="16.0sp" android:textColor="@color/cb_text_primary" android:gravity="center" android:id="@id/personBack" android:background="@drawable/button_dialog_main" android:focusable="true" android:layout_width="72.0dp" android:layout_height="42.0dp" android:text="返回" />
+  <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="118.0dp" android:layout_marginTop="10.0dp">
+    <ImageView android:id="@id/ivPersonProfile" android:background="@drawable/cb_poster_surface" android:layout_width="88.0dp" android:layout_height="118.0dp" android:src="@drawable/cb_brand_icon" android:scaleType="centerCrop" />
+    <LinearLayout android:gravity="center_vertical" android:orientation="vertical" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_marginLeft="14.0dp" android:layout_weight="1.0">
+      <TextView android:textSize="25.0sp" android:textStyle="bold" android:textColor="@color/cb_text_primary" android:id="@id/tvPersonName" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="2" />
+      <TextView android:textSize="14.0sp" android:textColor="@color/cb_accent" android:id="@id/tvPersonMeta" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6.0dp" />
+    </LinearLayout>
+  </LinearLayout>
+  <androidx.core.widget.NestedScrollView android:id="@id/personBiographyScroll" android:background="@drawable/cb_detail_panel_focus" android:padding="10.0dp" android:focusable="true" android:focusableInTouchMode="true" android:scrollbars="vertical" android:layout_width="match_parent" android:layout_height="150.0dp" android:layout_marginTop="10.0dp" android:clipChildren="true" android:clipToPadding="true">
+    <TextView android:textSize="15.0sp" android:textColor="@color/cb_text_secondary" android:id="@id/tvPersonBiography" android:layout_width="match_parent" android:layout_height="wrap_content" android:lineSpacingMultiplier="1.18" />
+  </androidx.core.widget.NestedScrollView>
+  <TextView android:textSize="17.0sp" android:textStyle="bold" android:textColor="@color/cb_text_primary" android:id="@id/tvPersonStatus" android:paddingBottom="4.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10.0dp" />
+  <com.owen.tvrecyclerview.widget.TvRecyclerView android:id="@id/personWorksView" android:focusable="true" android:visibility="gone" android:clipChildren="true" android:clipToPadding="true" android:layout_width="match_parent" android:layout_height="0.0dp" android:layout_weight="1.0" app:tv_horizontalSpacingWithMargins="5.0dp" app:tv_verticalSpacingWithMargins="5.0dp" />
+</LinearLayout>

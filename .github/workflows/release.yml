@@ -1,15 +1,15 @@
-name: Release ContinueBox
-
+name: Rebuild public APK (unsigned)
 on:
-  push:
-    tags:
-      - 'v*'
-
+  workflow_dispatch:
+    inputs:
+      base_release:
+        description: Release containing ContinueBox-build-base.apk
+        default: v2.2.5
+        required: true
 permissions:
-  contents: write
-
+  contents: read
 jobs:
-  release:
+  rebuild:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,18 +17,18 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
-      - name: Configure Android SDK path
-        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
-      - name: Build Android APK
-        run: ./gradlew :app:assembleJava64Debug --no-daemon
-      - name: Package NAS server
-        run: zip -r ContinueBox-sync-server.zip sync-server -x 'sync-server/.env' 'sync-server/data/*' '__pycache__/*'
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
+      - uses: actions/setup-python@v5
         with:
-          generate_release_notes: true
-          files: |
-            app/build/outputs/apk/java64/debug/ContinueBox_debug-java64.apk
-            ContinueBox-sync-server.zip
+          python-version: '3.12'
+      - name: Download build inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_RELEASE: ${{ inputs.base_release }}
+        run: |
+          gh release download "$BASE_RELEASE" -R "$GITHUB_REPOSITORY" -p ContinueBox-build-base.apk
+          curl --fail --location --output apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar
+      - run: python tools/rebuild_public.py --base ContinueBox-build-base.apk --apktool apktool.jar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ContinueBox-2.2.5-unsigned
+          path: ContinueBox-2.2.5-unsigned.apk

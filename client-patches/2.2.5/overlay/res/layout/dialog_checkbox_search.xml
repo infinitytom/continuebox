@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent">
+  <LinearLayout android:layout_gravity="center" android:orientation="vertical" android:id="@id/root" android:background="@drawable/shape_dialog_pg_search_checkbox" android:layout_width="@dimen/vs_420" android:layout_height="match_parent">
+    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:weightSum="2.0">
+      <TextView android:textSize="@dimen/ts_26" android:textColor="@color/dialog_text_primary" android:gravity="center" android:layout_gravity="center" android:id="@id/checkAll" android:background="@drawable/button_danmu_setting" android:padding="@dimen/vs_30" android:focusable="true" android:clickable="true" android:layout_width="0.0dp" android:layout_height="wrap_content" android:text="全选" android:layout_weight="1.0" />
+      <TextView android:textSize="@dimen/ts_26" android:textColor="@color/dialog_text_primary" android:gravity="center" android:layout_gravity="center" android:id="@id/clearAll" android:background="@drawable/button_danmu_setting" android:padding="@dimen/vs_30" android:focusable="true" android:clickable="true" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/vs_10" android:text="全不选" android:layout_weight="1.0" />
+    </LinearLayout>
+    <com.owen.tvrecyclerview.widget.TvRecyclerView android:orientation="vertical" android:id="@id/mGridView" android:layout_width="match_parent" android:layout_height="wrap_content" android:clipChildren="true" android:clipToPadding="true" />
+  </LinearLayout>
+</FrameLayout>

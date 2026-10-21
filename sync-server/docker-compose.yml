@@ -1,6 +1,10 @@
 services:
   tvbox-sync:
-    build: .
+    build:
+      context: .
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-slim}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
     image: tvbox-sync:local
     container_name: tvbox-sync
     restart: unless-stopped
@@ -9,7 +13,33 @@ services:
       TOKEN_SECRET: ${TOKEN_SECRET:?请在.env中设置TOKEN_SECRET}
       TOKEN_DAYS: ${TOKEN_DAYS:-30}
       ALLOW_REGISTER: ${ALLOW_REGISTER:-true}
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SECURITY: ${SMTP_SECURITY:-ssl}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
       MAX_RECORDS: ${MAX_RECORDS:-30}
+      TMDB_READ_TOKEN: ${TMDB_READ_TOKEN:-}
+      TMDB_LANGUAGE: ${TMDB_LANGUAGE:-zh-CN}
+      TMDB_CACHE_DAYS: ${TMDB_CACHE_DAYS:-30}
+      DANDAN_APP_ID: ${DANDAN_APP_ID:-}
+      DANDAN_APP_SECRET: ${DANDAN_APP_SECRET:-}
+      DANDAN_API_BASE: ${DANDAN_API_BASE:-https://api.dandanplay.net}
+      DANDAN_AUTH_MODE: ${DANDAN_AUTH_MODE:-credential}
+      DANDAN_VIA_PROXY: ${DANDAN_VIA_PROXY:-false}
+      DANDAN_CACHE_SECONDS: ${DANDAN_CACHE_SECONDS:-21600}
+      TRAKT_CLIENT_ID: ${TRAKT_CLIENT_ID:-}
+      TRAKT_CLIENT_SECRET: ${TRAKT_CLIENT_SECRET:-}
+      NEODB_API_BASE: ${NEODB_API_BASE:-https://neodb.social}
+      NEODB_CLIENT_ID: ${NEODB_CLIENT_ID:-}
+      NEODB_CLIENT_SECRET: ${NEODB_CLIENT_SECRET:-}
+      NEODB_REDIRECT_URI: ${NEODB_REDIRECT_URI:-urn:ietf:wg:oauth:2.0:oob}
+      NEODB_VISIBILITY: ${NEODB_VISIBILITY:-2}
+      OUTBOUND_PROXY: ${OUTBOUND_PROXY:-}
+      REVIEWS_CACHE_SECONDS: ${REVIEWS_CACHE_SECONDS:-900}
     volumes:
       - ./data:/data
     ports:

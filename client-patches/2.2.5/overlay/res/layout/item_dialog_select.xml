@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android" android:textSize="@dimen/ts_22" android:textColor="@color/dialog_text_primary" android:gravity="center" android:layout_gravity="center" android:id="@id/tvName" android:background="@drawable/button_danmu_setting" android:padding="@dimen/vs_10" android:focusable="true" android:clickable="true" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="@dimen/vs_50" android:text="@{name}" android:maxLines="2" android:ellipsize="end" />

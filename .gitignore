@@ -99,3 +99,20 @@ lint/tmp/
 *.hprof
 *.md
 output-metadata.json
+
+# Public release sources and local-only outputs
+!*.md
+!**/*.md
+__pycache__/
+*.py[cod]
+.pytest_cache/
+public-build/
+*.keystore
+sync-server/.env
+sync-server/.env.*
+!sync-server/.env.example
+sync-server/data/
+native-ui/local.properties
+native-ui/.gradle/
+native-ui/.kotlin/
+native-ui/**/build/

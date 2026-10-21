@@ -1,13 +1,14 @@
 #!/usr/bin/env sh
 set -eu
 cd "$(dirname "$0")"
-command -v docker >/dev/null 2>&1 || { echo '未找到 Docker，请先在飞牛 Docker 应用中安装 Docker。'; exit 1; }
+command -v docker >/dev/null 2>&1 || { echo '请先安装 Docker 和 Docker Compose。'; exit 1; }
 if [ ! -f .env ]; then
+  umask 077
+  cp .env.example .env
   secret=$(od -An -N48 -tx1 /dev/urandom | tr -d ' \n')
-  printf 'PORT=8080\nTOKEN_SECRET=%s\nTOKEN_DAYS=30\nALLOW_REGISTER=true\n' "$secret" > .env
-  echo '已生成 .env 配置文件。'
+  sed "s/^TOKEN_SECRET=.*/TOKEN_SECRET=$secret/" .env > .env.tmp
+  mv .env.tmp .env
+  echo '已生成 .env；新注册需配置 SMTP。请保留密钥并备份此文件。'
 fi
 docker compose up -d --build
-port=$(sed -n 's/^PORT=//p' .env)
-echo "部署完成：http://本机或NAS的Tailscale地址:${port}/docs"
-
+echo '部署完成，请访问 http://主机地址:配置端口/health；升级保留原 .env 与 data。'

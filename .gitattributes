@@ -1,0 +1,7 @@
+# These files are hashed byte for byte in the public build manifests.
+client-patches/** -text -whitespace
+sync-server/app/** -text
+*.jar binary
+*.png binary
+*.jpg binary
+*.jks binary

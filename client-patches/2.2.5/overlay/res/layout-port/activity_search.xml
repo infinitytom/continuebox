@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:orientation="vertical" android:background="@color/cb_background" android:padding="12.0dp" android:clipChildren="false" android:layout_width="match_parent" android:layout_height="match_parent">
+  <TextView android:textSize="16.0sp" android:textColor="@android:color/white" android:gravity="center" android:id="@id/tvSearchCheckboxBtn" android:background="@drawable/shape_user_focus" android:focusable="true" android:layout_width="match_parent" android:layout_height="44.0dp" android:text="选择搜索源" />
+  <TextView android:textSize="16.0sp" android:textColor="@android:color/white" android:gravity="center" android:id="@id/tvSearchMode" android:background="@drawable/shape_user_focus" android:focusable="true" android:layout_width="match_parent" android:layout_height="44.0dp" android:layout_marginTop="8.0dp" android:text="搜索方式 · 作品" />
+  <EditText android:textSize="17.0sp" android:textColor="@android:color/white" android:textColorHint="#99ffffff" android:id="@id/etSearch" android:background="@drawable/input_search" android:paddingLeft="12.0dp" android:paddingRight="12.0dp" android:layout_width="match_parent" android:layout_height="50.0dp" android:layout_marginTop="8.0dp" android:hint="输入片名或演员名" android:maxLines="1" android:singleLine="true" android:inputType="text" android:imeOptions="actionSearch" />
+  <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="46.0dp" android:layout_marginTop="8.0dp">
+    <TextView android:textSize="16.0sp" android:textColor="@android:color/white" android:gravity="center" android:id="@id/tvSearch" android:background="@drawable/shape_user_focus" android:focusable="true" android:layout_width="0.0dp" android:layout_height="match_parent" android:text="搜索" android:layout_weight="1.0" />
+    <Space android:layout_width="8.0dp" android:layout_height="1.0dp" />
+    <TextView android:textSize="16.0sp" android:textColor="@android:color/white" android:gravity="center" android:id="@id/tvClear" android:background="@drawable/shape_user_focus" android:focusable="true" android:layout_width="0.0dp" android:layout_height="match_parent" android:text="清空" android:layout_weight="1.0" />
+  </LinearLayout>
+  <com.github.tvbox.osc.ui.tv.widget.SearchKeyboard android:id="@id/keyBoardRoot" android:visibility="gone" android:layout_width="1.0dp" android:layout_height="1.0dp" />
+  <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="122.0dp" android:layout_marginTop="10.0dp">
+    <TextView android:textSize="17.0sp" android:textColor="@android:color/white" android:gravity="center_vertical" android:id="@id/wordSwitch" android:background="@drawable/shape_user_focus" android:paddingLeft="10.0dp" android:focusable="true" android:layout_width="match_parent" android:layout_height="38.0dp" android:text="热门 / 历史" />
+    <com.owen.tvrecyclerview.widget.TvRecyclerView android:id="@id/mGridViewWord" android:clipChildren="true" android:clipToPadding="true" android:layout_width="match_parent" android:layout_height="80.0dp" app:tv_horizontalSpacingWithMargins="4.0dp" app:tv_verticalSpacingWithMargins="4.0dp" />
+  </LinearLayout>
+  <LinearLayout android:orientation="vertical" android:id="@id/llHistoryWord" android:visibility="gone" android:layout_width="match_parent" android:layout_height="0.0dp" android:layout_marginTop="8.0dp" android:layout_weight="1.0">
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="44.0dp">
+      <TextView android:textSize="18.0sp" android:textStyle="bold" android:textColor="@android:color/white" android:gravity="center_vertical" android:layout_width="0.0dp" android:layout_height="match_parent" android:text="搜索历史" android:layout_weight="1.0" />
+      <ImageView android:id="@id/tvHistoryClear" android:background="@drawable/shape_user_focus" android:padding="10.0dp" android:focusable="true" android:layout_width="44.0dp" android:layout_height="44.0dp" android:src="@drawable/icon_delete" />
+    </LinearLayout>
+    <ScrollView android:layout_width="match_parent" android:layout_height="0.0dp" android:fillViewport="true" android:layout_weight="1.0" android:clipChildren="true" android:clipToPadding="true">
+      <GridLayout android:id="@id/historyWordGrid" android:layout_width="match_parent" android:layout_height="wrap_content" android:columnCount="3" android:useDefaultMargins="false" android:alignmentMode="alignMargins" />
+    </ScrollView>
+  </LinearLayout>
+  <LinearLayout android:orientation="vertical" android:id="@id/llLayout" android:layout_width="match_parent" android:layout_height="0.0dp" android:layout_marginTop="8.0dp" android:layout_weight="1.0">
+    <com.owen.tvrecyclerview.widget.TvRecyclerView android:id="@id/mGridView" android:visibility="invisible" android:clipChildren="true" android:clipToPadding="true" android:layout_width="match_parent" android:layout_height="match_parent" app:tv_horizontalSpacingWithMargins="5.0dp" app:tv_verticalSpacingWithMargins="5.0dp" />
+  </LinearLayout>
+</LinearLayout>

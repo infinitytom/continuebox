@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="vertical" android:background="@android:color/transparent" android:padding="@dimen/vs_6" android:focusable="true" android:clickable="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:elevation="0dp" android:clipChildren="false" android:clipToPadding="false">
+  <com.github.tvbox.osc.ui.tv.widget.NativeCardFrame android:background="@drawable/cb_card_focus" android:layout_width="@dimen/vs_200" android:layout_height="@dimen/vs_260" android:tag="cb_cover" android:padding="@dimen/vs_2" android:clipToOutline="true" android:duplicateParentState="true" android:elevation="2dp">
+    <ImageView android:id="@id/ivThumb" android:background="@drawable/cb_poster_surface" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:clipToOutline="true" android:padding="0dp" />
+    <View android:layout_gravity="bottom" android:background="@drawable/cb_card_scrim" android:layout_width="match_parent" android:layout_height="@dimen/vs_90" />
+    <LinearLayout android:gravity="bottom" android:layout_gravity="bottom" android:orientation="vertical" android:padding="@dimen/vs_9" android:layout_width="match_parent" android:layout_height="wrap_content">
+      <TextView android:textSize="@dimen/ts_15" android:textColor="@android:color/white" android:ellipsize="end" android:id="@id/tvNote" android:background="@drawable/cb_note_badge" android:paddingLeft="@dimen/vs_7" android:paddingTop="@dimen/vs_2" android:paddingRight="@dimen/vs_7" android:paddingBottom="@dimen/vs_2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="@dimen/vs_4" android:maxWidth="@dimen/vs_170" android:singleLine="true" />
+    </LinearLayout>
+    <TextView android:textSize="@dimen/ts_14" android:textColor="@color/cb_text_secondary" android:layout_gravity="left|top" android:id="@id/tvYear" android:background="@drawable/cb_meta_badge" android:paddingLeft="@dimen/vs_7" android:paddingTop="@dimen/vs_2" android:paddingRight="@dimen/vs_7" android:paddingBottom="@dimen/vs_2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_margin="@dimen/vs_8" android:singleLine="true" />
+    <TextView android:id="@id/tvArea" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    <TextView android:id="@id/tvLang" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    <TextView android:id="@id/tvActor" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    <FrameLayout android:id="@id/delFrameLayout" android:background="@drawable/shape_user_delete" android:visibility="gone" android:layout_width="match_parent" android:layout_height="match_parent">
+      <ImageView android:layout_gravity="center" android:layout_width="@dimen/vs_80" android:layout_height="@dimen/vs_80" android:src="@drawable/icon_delete" />
+    </FrameLayout>
+  </com.github.tvbox.osc.ui.tv.widget.NativeCardFrame>
+  <LinearLayout android:tag="cb_label" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingTop="@dimen/vs_12" android:paddingBottom="@dimen/vs_6">
+    <TextView android:textSize="@dimen/ts_20" android:textStyle="bold" android:textColor="@color/cb_text_primary" android:ellipsize="end" android:id="@id/tvName" android:layout_width="match_parent" android:layout_height="@dimen/vs_30" android:singleLine="true" android:marqueeRepeatLimit="marquee_forever" android:gravity="center_vertical" android:fontFamily="sans-serif-medium" />
+  </LinearLayout>
+</LinearLayout>
