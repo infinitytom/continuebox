@@ -20,10 +20,10 @@
     ],
     "format": {
       "duration": "94.000000",
-      "size": "17372210"
+      "size": "17419386"
     }
   },
-  "sha256": "84b6094dfc08e578bd0d3ad47e335071795b031ae71cff2c681bb2bc477b755a",
+  "sha256": "00c60da055f8a523b773bd206cb890a593c5a328a33d47c689fe0c2d8566fcce",
   "decode_check": "passed",
   "audio_source": "Original synthesized instrumental only. No speech or voice track.",
   "source": "Actual user-provided ContinueBox home screenshot, Jia Jin Chai episode playback/seek recording and Frieren moving-danmaku/send recording; real unmodified-release APK subscription and TMDB recommendation footage. No original test film, fictional catalogue or demo-account footage in this edit.",
@@ -54,8 +54,8 @@
       "filename": "Screenrecorder-2026-10-21-16-06-18-656.mp4",
       "sha256": "b089e36b75499430276d8b7995025c6dcf8d74f91bef346bdb950056c11379b7",
       "source_interval_seconds": [
-        12,
-        30
+        22,
+        40
       ]
     }
   ]
