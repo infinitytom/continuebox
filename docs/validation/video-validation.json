@@ -19,17 +19,26 @@
       }
     ],
     "format": {
-      "duration": "120.000000",
-      "size": "9106633"
+      "duration": "136.000000",
+      "size": "15128138"
     }
   },
-  "sha256": "18eda13f7a3fd16dad346cd3fb3afe6a56f13547cd37d491f3b8aec9654ac141",
+  "sha256": "22f5243a91bbfcac73059f0215fd6cdfaa3ba81c6e17361fc3fc83d4a6bb5b6b",
   "decode_check": "passed",
   "audio_source": "Original synthesized instrumental only. No speech or voice track.",
-  "source": "Published unmodified 2.2.5 APK on Android 11 Google APIs ARM translation, primary ABI arm64-v8a. Actual Fantaiying network trailer playback (Bai Yi Ni Xing Zhe), real NAS TMDB recommendations for The Terminal and click-through to global search; subscription browsing, clearly labeled original test-media cross-device playback and actual account/device UI.",
+  "source": "Published unmodified 2.2.5 APK on Android 11 Google APIs ARM translation, primary ABI arm64-v8a. User-supplied Yingyongbao ContinueBox screen recording: Jia Jin Chai episode 1 playback and seeking, original source seconds 54-68, installed APK version not independently verified. Danmaku sending/receiving described as feature entry points, not a completed send/receive test. Actual Fantaiying network trailer playback (Bai Yi Ni Xing Zhe), real NAS TMDB recommendations for The Terminal and click-through to global search; subscription browsing, clearly labeled original test-media cross-device playback and actual account/device UI.",
   "limitations": [
-    "Actual network trailer played successfully. Other tested subscription lines hit native ARM-translation errors; full-film playback is not verified. Cross-device section uses clearly marked original test media.",
-    "After recording, repeated Back navigation caused a playback-information error and a zero-position server record; further investigation required.",
-    "Danmaku and third-party integrations are UI/configuration demonstrations, not completed upstream authorization or overlay tests."
-  ]
+    "The user-supplied Yingyongbao recording shows episode 1 playback and seeking; its installed APK version was not independently verified. Other tests used the unmodified release APK.",
+    "Other tested subscription lines hit native ARM-translation errors in the Android Studio emulator; the user recording uses a separate Yingyongbao environment.",
+    "After the original cross-device recording, repeated Back navigation caused a playback-information error and a zero-position server record; further investigation required.",
+    "Danmaku receiving/sending is explained through the configuration/player entry points. Successful sending and reception were not recorded. Third-party integrations remain entry-point demonstrations."
+  ],
+  "user_recording": {
+    "filename": "ScreenRecord_2026-10-21-15-45-28-974.mp4",
+    "sha256": "57d74a0f66651573ba773029d48078c213e9d220ba7b1524e332f1260ede3ed4",
+    "in_seconds": 54,
+    "out_seconds": 68,
+    "audio_removed": true,
+    "content": "Jia Jin Chai episode 1 playback and seeking, user-recorded in Yingyongbao ContinueBox"
+  }
 }
