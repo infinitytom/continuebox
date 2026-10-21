@@ -1,0 +1,30 @@
+{
+  "probe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1920,
+        "height": 1080,
+        "avg_frame_rate": "30/1"
+      },
+      {
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "48000",
+        "channels": 2,
+        "avg_frame_rate": "0/0"
+      }
+    ],
+    "format": {
+      "duration": "58.000000",
+      "size": "3399209"
+    }
+  },
+  "sha256": "6b38c45dd0ced55e8661cef4fcbbc4ea81b68a14c2b19801406187d8e78118a9",
+  "decode_check": "passed",
+  "audio_source": "Original synthesized instrumental only. No speech or voice track.",
+  "source": "Android screenrecord; real app DEX/resources with ARM native libraries omitted for x86 compatibility; system-player playback."
+}

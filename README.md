@@ -20,6 +20,10 @@
 
 宣传视频为安卓模拟器上的真实界面与操作录屏，使用独立演示账号和原创演示片；只有字幕和原创纯音乐，无配音。演示素材不随安装包内置，也不代表提供影视数据源。
 
+[![宣传视频预览](assets/promo-preview.jpg)](https://github.com/infinitytom/continuebox/releases/download/v2.2.5/ContinueBox-2.2.5-promo.mp4)
+
+[视频内容与录制说明](docs/PROMO.md)
+
 ## 使用
 
 1. 在 Release 下载 `ContinueBox-2.2.5.apk`。Android 5.0+，ARM / ARM64；已有安装请先备份数据并核对签名。
