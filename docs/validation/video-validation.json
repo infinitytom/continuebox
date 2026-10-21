@@ -19,12 +19,12 @@
       }
     ],
     "format": {
-      "duration": "58.000000",
-      "size": "3399209"
+      "duration": "60.000000",
+      "size": "4970221"
     }
   },
-  "sha256": "6b38c45dd0ced55e8661cef4fcbbc4ea81b68a14c2b19801406187d8e78118a9",
+  "sha256": "64eab972c65cc8f2a9ca2dce13a3c175b1823a4b8b8b0d5762fd65edb15e39e6",
   "decode_check": "passed",
   "audio_source": "Original synthesized instrumental only. No speech or voice track.",
-  "source": "Android screenrecord; real app DEX/resources with ARM native libraries omitted for x86 compatibility; system-player playback."
+  "source": "Published unmodified 2.2.5 APK on Android 11 Google APIs ARM translation, primary ABI arm64-v8a. Actual user-specified subscription browsing. Playback not verified; preview disabled."
 }
