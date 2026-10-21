@@ -19,14 +19,14 @@
       }
     ],
     "format": {
-      "duration": "136.000000",
-      "size": "15128138"
+      "duration": "142.000000",
+      "size": "15338748"
     }
   },
-  "sha256": "22f5243a91bbfcac73059f0215fd6cdfaa3ba81c6e17361fc3fc83d4a6bb5b6b",
+  "sha256": "c9914274cdf6046ef38ea3f005be619a32394e560bfadd7fe776921e80dcc09f",
   "decode_check": "passed",
   "audio_source": "Original synthesized instrumental only. No speech or voice track.",
-  "source": "Published unmodified 2.2.5 APK on Android 11 Google APIs ARM translation, primary ABI arm64-v8a. User-supplied Yingyongbao ContinueBox screen recording: Jia Jin Chai episode 1 playback and seeking, original source seconds 54-68, installed APK version not independently verified. Danmaku sending/receiving described as feature entry points, not a completed send/receive test. Actual Fantaiying network trailer playback (Bai Yi Ni Xing Zhe), real NAS TMDB recommendations for The Terminal and click-through to global search; subscription browsing, clearly labeled original test-media cross-device playback and actual account/device UI.",
+  "source": "Published unmodified 2.2.5 APK on Android 11 Google APIs ARM translation, primary ABI arm64-v8a. User-supplied Yingyongbao ContinueBox screen recording: Jia Jin Chai episode 1 playback and seeking, original source seconds 54-68, installed APK version not independently verified. Danmaku sending/receiving described as feature entry points, not a completed send/receive test. Actual Fantaiying network trailer playback (Bai Yi Ni Xing Zhe), real NAS TMDB recommendations for The Terminal and click-through to global search; subscription browsing, clearly labeled original test-media cross-device playback and actual account/device UI. User-supplied 512x230 danmaku screenshot inserted for six seconds and explicitly labeled as a static image.",
   "limitations": [
     "The user-supplied Yingyongbao recording shows episode 1 playback and seeking; its installed APK version was not independently verified. Other tests used the unmodified release APK.",
     "Other tested subscription lines hit native ARM-translation errors in the Android Studio emulator; the user recording uses a separate Yingyongbao environment.",
@@ -40,5 +40,16 @@
     "out_seconds": 68,
     "audio_removed": true,
     "content": "Jia Jin Chai episode 1 playback and seeking, user-recorded in Yingyongbao ContinueBox"
+  },
+  "danmaku_still": {
+    "filename": "8efb4582f599440ebb0cd12ec6c7509e.png",
+    "sha256": "1daf5cd26f822e3ff7d33f65f0aced9d42184ace5c26d7e45e9adb93e27847af",
+    "original_dimensions": [
+      512,
+      230
+    ],
+    "start_seconds": 125,
+    "end_seconds": 131,
+    "presentation": "User-provided screenshot shown statically, with original content preserved. No synthesized moving danmaku. Does not verify sending or cross-client receipt."
   }
 }
