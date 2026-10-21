@@ -19,37 +19,44 @@
       }
     ],
     "format": {
-      "duration": "142.000000",
-      "size": "15338748"
+      "duration": "94.000000",
+      "size": "17372210"
     }
   },
-  "sha256": "c9914274cdf6046ef38ea3f005be619a32394e560bfadd7fe776921e80dcc09f",
+  "sha256": "84b6094dfc08e578bd0d3ad47e335071795b031ae71cff2c681bb2bc477b755a",
   "decode_check": "passed",
   "audio_source": "Original synthesized instrumental only. No speech or voice track.",
-  "source": "Published unmodified 2.2.5 APK on Android 11 Google APIs ARM translation, primary ABI arm64-v8a. User-supplied Yingyongbao ContinueBox screen recording: Jia Jin Chai episode 1 playback and seeking, original source seconds 54-68, installed APK version not independently verified. Danmaku sending/receiving described as feature entry points, not a completed send/receive test. Actual Fantaiying network trailer playback (Bai Yi Ni Xing Zhe), real NAS TMDB recommendations for The Terminal and click-through to global search; subscription browsing, clearly labeled original test-media cross-device playback and actual account/device UI. User-supplied 512x230 danmaku screenshot inserted for six seconds and explicitly labeled as a static image.",
+  "source": "Actual user-provided ContinueBox home screenshot, Jia Jin Chai episode playback/seek recording and Frieren moving-danmaku/send recording; real unmodified-release APK subscription and TMDB recommendation footage. No original test film, fictional catalogue or demo-account footage in this edit.",
   "limitations": [
-    "The user-supplied Yingyongbao recording shows episode 1 playback and seeking; its installed APK version was not independently verified. Other tests used the unmodified release APK.",
-    "Other tested subscription lines hit native ARM-translation errors in the Android Studio emulator; the user recording uses a separate Yingyongbao environment.",
-    "After the original cross-device recording, repeated Back navigation caused a playback-information error and a zero-position server record; further investigation required.",
-    "Danmaku receiving/sending is explained through the configuration/player entry points. Successful sending and reception were not recorded. Third-party integrations remain entry-point demonstrations."
+    "User-supplied installed APK versions were not independently verified.",
+    "Danmaku recording shows scrolling comments, a send action and the client success toast. A different client receiving that newly sent comment was not verified.",
+    "The home screenshot shows connected services; no new Emby/NeoDB authorization or cross-device continuation flow was recorded.",
+    "Other tested lines caused ARM-translation errors in the Android Studio emulator. Earlier cross-device tests also observed a playback-information error and zero-position record after repeated Back navigation; this media-only update does not fix those issues."
   ],
-  "user_recording": {
-    "filename": "ScreenRecord_2026-10-21-15-45-28-974.mp4",
-    "sha256": "57d74a0f66651573ba773029d48078c213e9d220ba7b1524e332f1260ede3ed4",
-    "in_seconds": 54,
-    "out_seconds": 68,
-    "audio_removed": true,
-    "content": "Jia Jin Chai episode 1 playback and seeking, user-recorded in Yingyongbao ContinueBox"
-  },
-  "danmaku_still": {
-    "filename": "8efb4582f599440ebb0cd12ec6c7509e.png",
-    "sha256": "1daf5cd26f822e3ff7d33f65f0aced9d42184ace5c26d7e45e9adb93e27847af",
-    "original_dimensions": [
-      512,
-      230
-    ],
-    "start_seconds": 125,
-    "end_seconds": 131,
-    "presentation": "User-provided screenshot shown statically, with original content preserved. No synthesized moving danmaku. Does not verify sending or cross-client receipt."
-  }
+  "user_media": [
+    {
+      "kind": "home",
+      "filename": "codex-clipboard-349fe79c-1f73-482a-8538-2124272c9ac1.png",
+      "sha256": "ed38ea5134c5cf1f1d9402b91e2841308deda430fae180b0b9e72eb634d9dfb7",
+      "source_interval_seconds": null
+    },
+    {
+      "kind": "drama",
+      "filename": "ScreenRecord_2026-10-21-15-45-28-974.mp4",
+      "sha256": "57d74a0f66651573ba773029d48078c213e9d220ba7b1524e332f1260ede3ed4",
+      "source_interval_seconds": [
+        54,
+        68
+      ]
+    },
+    {
+      "kind": "danmaku",
+      "filename": "Screenrecorder-2026-10-21-16-06-18-656.mp4",
+      "sha256": "b089e36b75499430276d8b7995025c6dcf8d74f91bef346bdb950056c11379b7",
+      "source_interval_seconds": [
+        12,
+        30
+      ]
+    }
+  ]
 }
