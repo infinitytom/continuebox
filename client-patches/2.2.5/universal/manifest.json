@@ -1,0 +1,62 @@
+{
+  "version": "2.2.5",
+  "base_sha256": "2dab1b283e4953e1885345c3083d507d4f929c51f1b3b5c0b46d355b6282b68f",
+  "abis": [
+    "armeabi-v7a",
+    "arm64-v8a"
+  ],
+  "donor": {
+    "file": "TVBox_q215613905_20260914-1520-python.apk",
+    "sha256": "e9160c2b4a57d75d4ad69d06f5532267cd31e7b8f9e4003ebd1eaad4c603982c",
+    "note": "Only conceal, Cronet and RTMP ARM32 binaries; their ARM64 counterparts exactly match the original release. Other seven ARM32 binaries use the existing public repository."
+  },
+  "libraries": {
+    "libconceal.so": {
+      "path": "client-patches/2.2.5/universal/armeabi-v7a/libconceal.so",
+      "sha256": "a66dfd79d7c1b4cd5c7164559e2f8585079ae2405ac9467672fc5b40719da5b2"
+    },
+    "libcronet.101.0.4951.41.so": {
+      "path": "client-patches/2.2.5/universal/armeabi-v7a/libcronet.101.0.4951.41.so",
+      "sha256": "fedb99b6a7cb77709efd811c006b106e98c631354be55f1ce7ea429a3137af92"
+    },
+    "libijkffmpeg.so": {
+      "path": "player/src/main/jniLibs/armeabi-v7a/libijkffmpeg.so",
+      "sha256": "668e5916dbf2a5880f5604c3a8b30783021b4d37adeaf67b95a38804ac13deab"
+    },
+    "libijksdl.so": {
+      "path": "player/src/main/jniLibs/armeabi-v7a/libijksdl.so",
+      "sha256": "5f1d89e853f26aa91aa7d51616b423fac204fe5082099ca4bddde8b6a28a46eb"
+    },
+    "libp2p.so": {
+      "path": "player/src/main/jniLibs/armeabi-v7a/libp2p.so",
+      "sha256": "20aa5065d21d6e26dcbd1690bbe40e789daf7b7224208cf61644ef52f9e739e6"
+    },
+    "libplayer.so": {
+      "path": "player/src/main/jniLibs/armeabi-v7a/libplayer.so",
+      "sha256": "8295f39c76a04aed458dfc32147e6754d143a3702af96763b89837c747283c22"
+    },
+    "libquickjs-android-wrapper.so": {
+      "path": "quickjs/src/main/jniLibs/armeabi-v7a/libquickjs-android-wrapper.so",
+      "sha256": "9e4c9373189b8410c87e475cb15948cce89cb211fc6e2fa4c057693570009dd7"
+    },
+    "librtmp-jni.so": {
+      "path": "client-patches/2.2.5/universal/armeabi-v7a/librtmp-jni.so",
+      "sha256": "ecacedc8eb3fbadd2bd12f037ec7e40a315b210473400ec95827cf1e48bc49f0"
+    },
+    "libxl_stat.so": {
+      "path": "player/src/main/jniLibs/armeabi-v7a/libxl_stat.so",
+      "sha256": "52093068e0ed5651d8565fb2f560de35d72cf73071319cf0d411be55b6983eba"
+    },
+    "libxl_thunder_sdk.so": {
+      "path": "player/src/main/jniLibs/armeabi-v7a/libxl_thunder_sdk.so",
+      "sha256": "2c202ae36003c2ceaba85bba6560d98f6a56c1559c50cc72d6e3499f9495294a"
+    }
+  },
+  "application_id": "com.continuebox.tv",
+  "original_application_id": "com.github.tvbox.osc.jun",
+  "identity_changes": [
+    "Manifest package",
+    "four provider authorities",
+    "BuildConfig.APPLICATION_ID"
+  ]
+}

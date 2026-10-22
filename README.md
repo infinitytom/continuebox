@@ -36,7 +36,7 @@
 
 ## 使用
 
-1. 在 Release 下载 `ContinueBox-2.2.5.apk`。Android 5.0+，ARM / ARM64；已有安装请先备份数据并核对签名。
+1. 在 Release 优先下载 `ContinueBox-2.2.5-universal.apk`。Android 5.0+，ARM32 / ARM64；原 `ContinueBox-2.2.5.apk` 仅支持 ARM64。universal 使用独立包名，可与原版共存，本地数据不会自动迁移。海信等电视的安装限制与排查见[电视安装说明](docs/TV-INSTALL.md)。
 2. 自行配置有权使用的数据源，或连接自己的 Emby。
 3. 将服务端包解压到支持 Docker 的主机，运行 `sh install.sh`；Windows 使用 `install.ps1`。
 4. 配置自己的 SMTP 后，新用户可用邮箱验证码注册；旧账号仍可用原账号密码登录。
