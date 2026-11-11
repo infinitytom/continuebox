@@ -4,9 +4,18 @@
 
 ![续映图标](assets/continuebox-icon.png)
 
-**公开版 2.2.5 · 同步服务端 0.27.1**
+**公开版 2.2.6 · 同步服务端 0.27.1**
 
-[下载 APK 与服务端](https://github.com/infinitytom/continuebox/releases/tag/v2.2.5) · [真实操作宣传视频](https://github.com/infinitytom/continuebox/releases/download/v2.2.5/ContinueBox-2.2.5-promo.mp4) · [源码与构建说明](docs/PUBLIC-BUILD.md)
+[下载 APK 与服务端](https://github.com/infinitytom/continuebox/releases/tag/v2.2.6) · [真实操作宣传视频](https://github.com/infinitytom/continuebox/releases/download/v2.2.5/ContinueBox-2.2.5-promo.mp4) · [源码与构建说明](docs/PUBLIC-BUILD.md)
+
+## 2.2.6：自动更新与新手入口
+
+- 启动时后台检查 GitHub 最新正式版，正常情况下每天最多一次；失败静默跳过，至少一小时后重试。仅检查本仓库正式版、精确匹配的 universal APK，不下载或安装其他资源。
+- 设置 → 关于：手动检查软件更新、关闭或开启自动检测。发现新版后由用户确认下载；安装由系统确认。电视无浏览器时可用手机下载并推送到电视。
+- 修正网盘说明：首页按遥控器“确定” → “网盘配置” → 选择对应网盘并按提示登录。续映同步账号不能代替网盘账号。
+- [下载新手图文 PDF](https://github.com/infinitytom/continuebox/releases/download/v2.2.6/ContinueBox-2.2.6-quickstart-zh.pdf)，含 TCL 手机推送安装、饭太硬配置和可选同步服务说明。
+- 保持独立包名 `com.continuebox.tv`，可覆盖同签名的 2.2.5 universal；其他包名版本仍为并存安装，本地数据不会自动迁移。
+- [2.2.6 构建与验证说明](docs/RELEASE-2.2.6.md)。以下保留 2.2.5 基线介绍。
 
 ## 本次更新
 
@@ -36,7 +45,7 @@
 
 ## 使用
 
-1. 在 Release 优先下载 `ContinueBox-2.2.5-universal.apk`。Android 5.0+，ARM32 / ARM64；原 `ContinueBox-2.2.5.apk` 仅支持 ARM64。universal 使用独立包名，可与原版共存，本地数据不会自动迁移。海信等电视的安装限制与排查见[电视安装说明](docs/TV-INSTALL.md)。
+1. 在 Release 优先下载 `ContinueBox-2.2.6-universal.apk`。Android 5.0+，ARM32 / ARM64；原 `ContinueBox-2.2.5.apk` 仅支持 ARM64。universal 使用独立包名，可与原版共存，本地数据不会自动迁移。海信等电视的安装限制与排查见[电视安装说明](docs/TV-INSTALL.md)。
 2. 自行配置有权使用的数据源，或连接自己的 Emby。
 3. 将服务端包解压到支持 Docker 的主机，运行 `sh install.sh`；Windows 使用 `install.ps1`。
 4. 配置自己的 SMTP 后，新用户可用邮箱验证码注册；旧账号仍可用原账号密码登录。

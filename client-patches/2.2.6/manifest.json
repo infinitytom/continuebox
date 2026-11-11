@@ -1,0 +1,24 @@
+{
+  "version": "2.2.6",
+  "version_code": 20206,
+  "application_id": "com.continuebox.tv",
+  "base_asset": "ContinueBox-2.2.5-universal.apk",
+  "base_release": "v2.2.5",
+  "base_sha256": "4800c998151b9ce5cfa021a2b565a2435c85e29f04271d0d1dd7c0b91dfdab4b",
+  "files": {
+    "apktool.yml": "6c24950972f9994b183dd0a562519ba20f3bd78f92f94479b32b8d8c7e62a7c1",
+    "smali_classes16/com/github/tvbox/osc/BuildConfig.smali": "ad90165dc6476546f0c559d0631536367d2d4395b640999f3d798611848b2afe",
+    "smali_classes9/com/github/tvbox/osc/ui/activity/HomeActivity.smali": "80e425d242ab497a51a04576e7eaf5ba3accba62f9c4b9b71407fbd8b507d234",
+    "smali_classes12/com/github/tvbox/osc/ui/dialog/AboutDialog.smali": "d54bf3c94b54fa677e7e1d7a756dcd571526cbc289d952c74d6887aceccdacb6",
+    "smali_classes12/com/github/tvbox/osc/util/CloudPortal.smali": "6117a9f75907fc4995fdc9c110d40140bd59602f06c392502864cbcc10f193d0",
+    "smali_classes19/com/github/tvbox/osc/util/UpdateChecker$$ExternalSyntheticLambda0.smali": "343765c9f93c522f6479a458cb1ae6a2d3604445f584239b39e999ba28acfa54",
+    "smali_classes19/com/github/tvbox/osc/util/UpdateChecker$$ExternalSyntheticLambda1.smali": "da00ec9c2f94e7299faee26e0a7df2022b1a46dadf5df7848c2383cb93cd82ac",
+    "smali_classes19/com/github/tvbox/osc/util/UpdateChecker$$ExternalSyntheticLambda2.smali": "da9295a0a439a75dcbd92c4460ee00945044ff6821eb9a5e93f5af6a105ca523",
+    "smali_classes19/com/github/tvbox/osc/util/UpdateChecker$$ExternalSyntheticLambda3.smali": "e1eb51d5090f78d63974847d5aafd814f5067de99c66dac712f47ae861ddc8a0",
+    "smali_classes19/com/github/tvbox/osc/util/UpdateChecker$$ExternalSyntheticLambda4.smali": "a7199c3d69924651d2cb9a9b93d51e6a2b64181aa2cb3cfc06be87abadb3e699",
+    "smali_classes19/com/github/tvbox/osc/util/UpdateChecker$$ExternalSyntheticLambda5.smali": "ef4c91163ae37794b2253b36fa3cca152782d338b4f707c10b6be7a238fb2a6d",
+    "smali_classes19/com/github/tvbox/osc/util/UpdateChecker$$ExternalSyntheticLambda6.smali": "f8a78b589a5748558e4a7c64a3177de6cad85481d93de9d307d7c00656ea202d",
+    "smali_classes19/com/github/tvbox/osc/util/UpdateChecker.smali": "57bd0e5940a7417bab7a408fe91080da72655921ad7d8a883862cd717354ac9a",
+    "res/layout/dialog_about.xml": "a802f5a774ebd61fb06b38ac9d24bc6ec4d1a6a2191230bb49b0b2d0ae07df00"
+  }
+}

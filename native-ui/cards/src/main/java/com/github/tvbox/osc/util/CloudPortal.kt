@@ -40,8 +40,8 @@ object CloudPortal {
         } catch (_: Exception) { "尚未选择" }
         box.addView(AccountPortal.text(c, "当前数据源：" + source.ifBlank { "尚未选择" }))
         box.addView(AccountPortal.text(c, "网盘在哪里登录？", 17f, Color.rgb(237,243,250)))
-        box.addView(AccountPortal.text(c, "在所选数据源的首页，找到“管理网盘”“网盘设置”或“登录网盘”，选择网盘后按提示扫码或填写登录信息。"))
-        box.addView(AccountPortal.text(c, "本页用于找到配置入口。登录续映账号后，仍需在数据源中单独登录网盘。"))
+        box.addView(AccountPortal.text(c, "回到首页，按遥控器“确定”，在弹出的菜单中选择“网盘配置”；再选择对应网盘，按当前页面提示扫码或填写登录信息。"))
+        box.addView(AccountPortal.text(c, "先加载饭太硬配置。网盘登录入口在首页的“网盘配置”，本页不是网盘登录窗口。续映账号与网盘账号不同，需要分别登录。"))
         val names = try {
             val jar = apiClass.getDeclaredField("jarLoader").apply { isAccessible=true }.get(api)
             val loaded = jar.javaClass.getDeclaredField("loaders").apply { isAccessible=true }.get(jar) as Map<*, *>
@@ -57,7 +57,7 @@ object CloudPortal {
         val local = try { managerClass.getMethod("getAddress", Boolean::class.javaPrimitiveType).invoke(manager, true)?.toString().orEmpty() } catch (_: Exception) { "" }
         val lan = try { managerClass.getMethod("getAddress", Boolean::class.javaPrimitiveType).invoke(manager, false)?.toString().orEmpty() } catch (_: Exception) { "" }
         box.addView(AccountPortal.text(c, "本机配置地址：" + lan.ifBlank { "当前没有局域网地址" }, 13f))
-        box.addView(AccountPortal.text(c, "同一 Wi-Fi 下，可在手机浏览器输入上面的地址设置接口；网盘登录仍按数据源中的网盘菜单完成。", 12f))
+        box.addView(AccountPortal.text(c, "上面的本机网页仅用于配置接口，不等于网盘登录。手机扫码登录网盘时，请扫描电视“网盘配置”当前显示的二维码，再在对应网盘官方 App 确认授权。", 12f))
         AccountPortal.button(c, box, "打开本机配置网页", true) {
             if (local.isBlank()) status.text="本机配置服务尚未启动，请重开应用"
             else openLocal(c, local)
