@@ -46,7 +46,7 @@ def notices(go):
         return Path(subprocess.check_output([go, *args], cwd=ROOT, text=True).strip())
 
     projects = {"Go": query("env", "GOROOT")}
-    for module in ("github.com/ebitengine/purego", "golang.org/x/term", "golang.org/x/sys"):
+    for module in ("github.com/ebitengine/purego", "github.com/tailscale/hujson"):
         projects[module] = query("list", "-m", "-f", "{{.Dir}}", module)
     return "\n\n".join(
         f"{name}\n\n{(directory / 'LICENSE').read_text(encoding='utf-8')}"
@@ -60,8 +60,8 @@ def main():
     out = Path(sys.argv[1]).resolve()
     go = sys.argv[2] if len(sys.argv) == 3 else "go"
     out.mkdir(parents=True, exist_ok=True)
-    setup = out / "ContinueBox-Setup.exe"
-    archive = out / "ContinueBox-muOS-0.1.0-preview.muxapp"
+    setup = out / "ContinueBox-TVBox-Setup.exe"
+    archive = out / "ContinueBox-muOS-0.2.0-TVBox-preview.muxapp"
     with tempfile.TemporaryDirectory() as temporary:
         stage = Path(temporary)
         binary = stage / "continuebox"

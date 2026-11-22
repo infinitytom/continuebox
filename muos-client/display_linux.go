@@ -172,9 +172,9 @@ func (s *screen) action() string {
 		return map[uint32]string{13: "select", 27: "back", 1073741906: "up",
 			1073741905: "down", 1073741904: "prev", 1073741903: "next",
 			1073741899: "page-prev", 1073741902: "page-next",
-			8: "back", 32: "select"}[uint32(event[2]>>32)]
+			1073741883: "submit", 8: "page-prev", 32: "space"}[uint32(event[2]>>32)]
 	case 0x651:
-		return map[uint8]string{0: "select", 1: "back", 9: "page-prev", 10: "page-next",
+		return map[uint8]string{0: "select", 1: "back", 2: "space", 6: "submit", 9: "page-prev", 10: "page-next",
 			11: "up", 12: "down", 13: "prev", 14: "next"}[uint8(event[1]>>32)]
 	}
 	return ""

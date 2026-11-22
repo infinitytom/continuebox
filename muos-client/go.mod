@@ -4,7 +4,5 @@ go 1.27.4
 
 require (
 	github.com/ebitengine/purego v0.9.1
-	golang.org/x/term v0.48.0
+	github.com/tailscale/hujson v0.0.0-20260727124030-b80ff77dac4f
 )
-
-require golang.org/x/sys v0.50.0 // indirect

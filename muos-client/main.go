@@ -3,172 +3,399 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
+	"path"
+	"regexp"
 	"strings"
 	"time"
 
-	"golang.org/x/term"
+	"github.com/tailscale/hujson"
 )
 
-type settings struct {
-	Server string `json:"server"`
-	Token  string `json:"token"`
-}
+type field string
 
-type client struct {
-	settings
-	http *http.Client
-}
-
-func connect(cfg settings) (*client, error) {
-	cfg.Server = strings.TrimRight(strings.TrimSpace(cfg.Server), "/")
-	u, err := url.Parse(cfg.Server)
-	if err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" ||
-		(u.Scheme != "https" && u.Scheme != "http") {
-		return nil, errors.New("请输入完整的 HTTP 或 HTTPS 服务地址")
-	}
-	return &client{cfg, &http.Client{
-		Timeout:       8 * time.Second,
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}}, nil
-}
-
-func (c *client) call(method, path string, body, out any) error {
-	var reader io.Reader
-	if body != nil {
-		data, err := json.Marshal(body)
-		if err != nil {
-			return err
-		}
-		reader = bytes.NewReader(data)
-	}
-	req, err := http.NewRequest(method, c.Server+path, reader)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("User-Agent", "ContinueBox-muOS/0.1")
-	if reader != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	if c.Token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.Token)
-	}
-	res, err := c.http.Do(req)
-	if err != nil {
-		return errors.New("无法连接续映服务器，请检查网络、地址和证书")
-	}
-	defer res.Body.Close()
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return fmt.Errorf("续映服务器返回 HTTP %d", res.StatusCode)
-	}
-	if out == nil {
+func (f *field) UnmarshalJSON(data []byte) error {
+	if bytes.Equal(data, []byte("null")) {
+		*f = ""
 		return nil
 	}
-	return json.NewDecoder(io.LimitReader(res.Body, 4<<20)).Decode(out)
+	if len(data) > 0 && data[0] == '"' {
+		var value string
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		*f = field(value)
+		return nil
+	}
+	var number json.Number
+	if err := json.Unmarshal(data, &number); err != nil {
+		return err
+	}
+	*f = field(number)
+	return nil
+}
+
+type site struct {
+	Name string          `json:"name"`
+	Kind field           `json:"type"`
+	API  string          `json:"api"`
+	Ext  json.RawMessage `json:"ext"`
+}
+
+type subscriptionLink struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+type subscription struct {
+	Sites   []site             `json:"sites"`
+	Links   []subscriptionLink `json:"urls"`
+	Skipped int                `json:"-"`
+}
+
+type category struct {
+	ID   field  `json:"type_id"`
+	Name string `json:"type_name"`
 }
 
 type media struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Subtitle string `json:"subtitle"`
-	Type     string `json:"type"`
-	Note     string `json:"note"`
-	Position int64  `json:"position_ms"`
-	Duration int64  `json:"runtime_ms"`
+	ID    field  `json:"vod_id"`
+	Name  string `json:"vod_name"`
+	Note  string `json:"vod_remarks"`
+	From  string `json:"vod_play_from"`
+	Links string `json:"vod_play_url"`
 }
 
 type catalog struct {
-	Items []media `json:"items"`
-	Total int     `json:"total"`
+	Categories []category `json:"class"`
+	Items      []media    `json:"list"`
+	Pages      field      `json:"pagecount"`
 }
 
-func (m media) label() string {
-	if m.Subtitle != "" {
-		return m.Name + " · " + m.Subtitle
-	}
-	return m.Name
+type episode struct {
+	Name, Flag, Link string
 }
 
-func (c *client) episodes(m media) ([]media, error) {
-	var detail struct {
-		List []struct {
-			Links string `json:"vod_play_url"`
-		} `json:"list"`
+const maxResponse = 4 << 20
+
+var network = &http.Client{
+	Timeout: 10 * time.Second,
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 5 || !webURL(req.URL) ||
+			(via[len(via)-1].URL.Scheme == "https" && req.URL.Scheme != "https") {
+			return http.ErrUseLastResponse
+		}
+		return nil
+	},
+}
+
+var configEnvelope = regexp.MustCompile(`[A-Za-z0-9]{8}\*\*`)
+
+func webURL(u *url.URL) bool {
+	return u != nil && (u.Scheme == "http" || u.Scheme == "https") &&
+		u.Hostname() != "" && u.User == nil
+}
+
+func resolve(base *url.URL, raw string) (*url.URL, error) {
+	raw = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(raw), "\ufeff"))
+	if raw == "" || len(raw) > 4096 || strings.ContainsAny(raw, "\r\n\x00") {
+		return nil, errors.New("地址为空或格式无效")
 	}
-	if err := c.call("GET", "/api/v1/emby/item/"+url.PathEscape(m.ID), nil, &detail); err != nil {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil, errors.New("地址格式无效")
+	}
+	if base != nil {
+		u = base.ResolveReference(u)
+	}
+	if !webURL(u) {
+		return nil, errors.New("请使用 HTTP 或 HTTPS 地址")
+	}
+	return u, nil
+}
+
+func get(u *url.URL) ([]byte, *url.URL, error) {
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, nil, errors.New("无法创建请求")
+	}
+	req.Header.Set("User-Agent", "ContinueBox-muOS/0.2")
+	res, err := network.Do(req)
+	if err != nil {
+		return nil, nil, errors.New("请求失败，请检查网络、地址和证书")
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, nil, fmt.Errorf("站点返回 HTTP %d", res.StatusCode)
+	}
+	raw, err := io.ReadAll(io.LimitReader(res.Body, maxResponse+1))
+	if err != nil || len(raw) > maxResponse {
+		return nil, nil, errors.New("读取响应失败，或配置超过 4 MiB")
+	}
+	return bytes.TrimSpace(bytes.TrimPrefix(raw, []byte{0xef, 0xbb, 0xbf})), res.Request.URL, nil
+}
+
+func loadSubscription(raw string) (subscription, error) {
+	var cfg subscription
+	u, err := resolve(nil, raw)
+	if err != nil {
+		return cfg, err
+	}
+	body, base, err := get(u)
+	if err != nil {
+		return cfg, err
+	}
+	standard, err := subscriptionJSON(body)
+	if err != nil || json.Unmarshal(standard, &cfg) != nil {
+		return cfg, errors.New("无法读取 TVBox JSON 配置")
+	}
+	sites := cfg.Sites[:0]
+	for _, entry := range cfg.Sites {
+		if entry.Kind != "0" && entry.Kind != "1" && entry.Kind != "4" {
+			cfg.Skipped++
+			continue
+		}
+		api, err := resolve(base, entry.API)
+		if err != nil {
+			cfg.Skipped++
+			continue
+		}
+		entry.API = api.String()
+		sites = append(sites, entry)
+	}
+	cfg.Sites = sites
+	links := cfg.Links[:0]
+	for _, entry := range cfg.Links {
+		if link, err := resolve(base, entry.URL); err == nil {
+			entry.URL = link.String()
+			links = append(links, entry)
+		}
+	}
+	cfg.Links = links
+	if len(cfg.Sites)+len(cfg.Links) == 0 {
+		if cfg.Skipped != 0 {
+			return cfg, errors.New("此订阅没有可用接口，可能需要安卓 Spider 插件")
+		}
+		return cfg, errors.New("配置没有可用的站点或子订阅")
+	}
+	return cfg, nil
+}
+
+func subscriptionJSON(body []byte) ([]byte, error) {
+	if bytes.HasPrefix(body, []byte("{")) {
+		return hujson.Standardize(body)
+	}
+	marker := configEnvelope.FindIndex(body)
+	if marker == nil {
+		return hujson.Standardize(body)
+	}
+	payload := strings.Join(strings.Fields(string(body[marker[1]:])), "")
+	decoded, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil {
+		decoded, err = base64.RawStdEncoding.DecodeString(payload)
+	}
+	if err != nil {
 		return nil, err
 	}
-	var rows []media
-	if len(detail.List) != 0 {
-		for _, segment := range strings.Split(detail.List[0].Links, "#") {
-			label, id, ok := strings.Cut(segment, "$")
-			if ok && id != "" {
-				rows = append(rows, media{ID: id, Name: m.Name, Subtitle: label, Type: "Episode", Note: label})
+	return hujson.Standardize(bytes.TrimPrefix(decoded, []byte{0xef, 0xbb, 0xbf}))
+}
+
+func (s site) request(params url.Values) ([]byte, *url.URL, error) {
+	u, err := resolve(nil, s.API)
+	if err != nil {
+		return nil, nil, err
+	}
+	query := u.Query()
+	for key, values := range params {
+		query[key] = values
+	}
+	if s.Kind == "4" && len(s.Ext) != 0 && string(s.Ext) != "null" {
+		var value string
+		if json.Unmarshal(s.Ext, &value) != nil {
+			value = string(s.Ext)
+		}
+		if value != "" {
+			query.Set("extend", value)
+		}
+	}
+	u.RawQuery = query.Encode()
+	return get(u)
+}
+
+func (s site) catalog(params url.Values) (catalog, *url.URL, error) {
+	var result catalog
+	if params.Has("t") || params.Has("ids") || params.Has("wd") {
+		action := "detail"
+		if s.Kind == "0" {
+			action = "videolist"
+		}
+		params.Set("ac", action)
+	}
+	if s.Kind == "4" {
+		switch {
+		case params.Has("wd"):
+			params.Set("quick", "false")
+		case !params.Has("ids"):
+			params.Set("filter", "true")
+			if params.Has("t") {
+				params.Set("ext", "e30=")
 			}
 		}
 	}
-	return rows, nil
+	body, base, err := s.request(params)
+	if err != nil {
+		return result, base, err
+	}
+	if s.Kind == "0" && bytes.HasPrefix(body, []byte("<")) {
+		result, err = readXML(body)
+	} else {
+		err = json.Unmarshal(body, &result)
+	}
+	if err != nil || (result.Items == nil && result.Categories == nil && result.Pages == "") {
+		return catalog{}, nil, errors.New("站点没有返回可识别的影视列表")
+	}
+	return result, base, nil
+}
+
+func readXML(body []byte) (catalog, error) {
+	var rss struct {
+		XMLName    xml.Name `xml:"rss"`
+		Categories []struct {
+			ID   string `xml:"id,attr"`
+			Name string `xml:",chardata"`
+		} `xml:"class>ty"`
+		List struct {
+			Pages  string `xml:"pagecount,attr"`
+			Videos []struct {
+				ID    string `xml:"id"`
+				Name  string `xml:"name"`
+				Note  string `xml:"note"`
+				Lines []struct {
+					Flag  string `xml:"flag,attr"`
+					Links string `xml:",chardata"`
+				} `xml:"dl>dd"`
+			} `xml:"video"`
+		} `xml:"list"`
+	}
+	if err := xml.Unmarshal(body, &rss); err != nil {
+		return catalog{}, err
+	}
+	result := catalog{Pages: field(rss.List.Pages), Items: []media{}, Categories: []category{}}
+	for _, entry := range rss.Categories {
+		result.Categories = append(result.Categories, category{field(entry.ID), entry.Name})
+	}
+	for _, entry := range rss.List.Videos {
+		var flags, links []string
+		for _, line := range entry.Lines {
+			flags = append(flags, line.Flag)
+			links = append(links, line.Links)
+		}
+		result.Items = append(result.Items, media{field(entry.ID), entry.Name, entry.Note, strings.Join(flags, "$$$"), strings.Join(links, "$$$")})
+	}
+	return result, nil
+}
+
+func episodes(item media) []episode {
+	flags := strings.Split(item.From, "$$$")
+	var result []episode
+	for line, group := range strings.Split(item.Links, "$$$") {
+		flag := ""
+		if line < len(flags) {
+			flag = flags[line]
+		}
+		for _, raw := range strings.Split(group, "#") {
+			name, link, hasLabel := strings.Cut(strings.TrimSpace(raw), "$")
+			if !hasLabel {
+				name, link = "正片", name
+			}
+			if link != "" {
+				result = append(result, episode{name, flag, link})
+			}
+		}
+	}
+	return result
+}
+
+func (s site) playback(base *url.URL, ep episode) (string, error) {
+	link := ep.Link
+	if s.Kind == "4" {
+		var reply struct {
+			URL    string          `json:"url"`
+			Parse  field           `json:"parse"`
+			JX     field           `json:"jx"`
+			Header json.RawMessage `json:"header"`
+		}
+		raw, effective, err := s.request(url.Values{"play": {ep.Link}, "flag": {ep.Flag}})
+		if err != nil {
+			return "", err
+		}
+		if json.Unmarshal(raw, &reply) != nil {
+			return "", errors.New("远程站点未返回有效播放地址")
+		}
+		if reply.Parse != "" && reply.Parse != "0" || reply.JX != "" && reply.JX != "0" {
+			return "", errors.New("这条线路需要网页解析，请换一条直连线路")
+		}
+		switch strings.TrimSpace(string(reply.Header)) {
+		case "", "null", "{}", `""`, `"{}"`:
+		default:
+			return "", errors.New("这一线路要求自定义播放请求头，请换一条直连线路")
+		}
+		link, base = reply.URL, effective
+	}
+	stream, err := resolve(base, link)
+	if err != nil {
+		return "", errors.New("该线路没有 HTTP 视频地址")
+	}
+	switch strings.ToLower(path.Ext(stream.Path)) {
+	case ".mp4", ".m3u8", ".mkv", ".webm", ".ts", ".mov", ".flv", ".m4v", ".avi", ".m3u":
+		return stream.String(), nil
+	}
+	req, err := http.NewRequest("GET", stream.String(), nil)
+	if err != nil {
+		return "", errors.New("播放地址无效")
+	}
+	req.Header.Set("Range", "bytes=0-511")
+	res, err := network.Do(req)
+	if err != nil {
+		return "", errors.New("无法连接视频地址")
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusPartialContent {
+		return "", fmt.Errorf("视频地址返回 HTTP %d", res.StatusCode)
+	}
+	mime := strings.ToLower(res.Header.Get("Content-Type"))
+	if strings.HasPrefix(mime, "video/") || strings.Contains(mime, "mpegurl") {
+		return res.Request.URL.String(), nil
+	}
+	sample, _ := io.ReadAll(io.LimitReader(res.Body, 512))
+	if bytes.HasPrefix(bytes.TrimSpace(sample), []byte("#EXTM3U")) || len(sample) >= 8 && string(sample[4:8]) == "ftyp" {
+		return res.Request.URL.String(), nil
+	}
+	return "", errors.New("这条线路没有返回可直接播放的视频")
 }
 
 func setup() error {
-	in := bufio.NewReader(os.Stdin)
-	fmt.Print("ContinueBox server URL: ")
-	server, _ := in.ReadString('\n')
-	c, err := connect(settings{Server: server})
+	fmt.Print("TVBox subscription URL: ")
+	value, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil && len(value) == 0 {
+		return err
+	}
+	cfg, err := loadSubscription(value)
 	if err != nil {
 		return err
 	}
-	fmt.Print("Username: ")
-	username, _ := in.ReadString('\n')
-	fmt.Print("Password: ")
-	password, err := term.ReadPassword(int(os.Stdin.Fd()))
-	fmt.Println()
-	if err != nil {
-		return errors.New("run setup in a terminal")
-	}
-	var session struct {
-		Token string `json:"token"`
-	}
-	err = c.call("POST", "/api/v1/auth/login", map[string]string{
-		"username": strings.TrimSpace(username), "password": string(password),
-	}, &session)
-	if err != nil {
+	if err := os.WriteFile("continuebox-tvbox.txt", []byte(strings.TrimSpace(value)+"\n"), 0600); err != nil {
 		return err
 	}
-	if session.Token == "" {
-		return errors.New("服务器未返回登录令牌")
-	}
-	c.Token = session.Token
-	var status struct {
-		Connected bool `json:"connected"`
-	}
-	if err = c.call("GET", "/api/v1/emby/status", nil, &status); err != nil {
-		return err
-	}
-	if !status.Connected {
-		return errors.New("服务器尚未为这个账号配置 Emby")
-	}
-	raw, err := json.MarshalIndent(c.settings, "", "  ")
-	if err != nil {
-		return err
-	}
-	file, err := os.OpenFile("continuebox.json", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	if _, err = file.Write(raw); err != nil {
-		return err
-	}
-	path, _ := filepath.Abs(file.Name())
-	fmt.Println("Copy this file to the root of SD1:", path)
+	fmt.Printf("可用接口 %d 个，子订阅 %d 个。复制 continuebox-tvbox.txt 到 TF1 根目录。\n", len(cfg.Sites), len(cfg.Links))
 	return nil
 }
 

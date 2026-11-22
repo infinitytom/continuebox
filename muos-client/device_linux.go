@@ -1,344 +1,403 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
-	"syscall"
-	"time"
+	"strings"
 )
 
 const (
-	pageSize    = 24
 	visibleRows = 7
 	wasabi      = "/opt/muos/frontend/muxmedia"
-	stateFile   = "/run/muos/wasabi/now.json"
-	controlFile = "/run/muos/wasabi/control"
 )
 
-var sections = []struct{ key, title string }{
-	{"resume", "继续观看"}, {"latest", "最新入库"}, {"movies", "电影"}, {"series", "剧集"},
+var (
+	fg         = color{228, 240, 241, 255}
+	muted      = color{151, 173, 185, 255}
+	accent     = color{98, 231, 189, 255}
+	background = color{16, 26, 35, 255}
+)
+
+type row struct {
+	label, note string
+	open        func() error
 }
 
-type browserState struct {
-	catalog
-	tab, page, selected int
-	showEpisodes        bool
-	parentCatalog       catalog
-	parentSelection     int
-	message             string
+type view struct {
+	title                 string
+	rows                  []row
+	selected, page, pages int
+	reload                func(int) error
+	message               string
 }
 
-func (b *browserState) load(c *client) {
-	b.selected = 0
-	b.catalog = catalog{}
-	request := fmt.Sprintf("/api/v1/emby/catalog?section=%s&start=%d&limit=%d",
-		sections[b.tab].key, b.page*pageSize, pageSize)
-	if err := c.call("GET", request, nil, &b.catalog); err != nil {
-		b.message = err.Error()
-	} else {
-		b.message = ""
+type browser struct {
+	screen   *screen
+	config   string
+	stack    []*view
+	keyboard *keyboard
+}
+
+func (b *browser) current() *view  { return b.stack[len(b.stack)-1] }
+func (b *browser) push(next *view) { b.stack = append(b.stack, next) }
+
+func (b *browser) home() *view {
+	return &view{title: "TVBox 订阅", rows: []row{
+		{label: "输入或修改订阅地址", open: func() error {
+			raw, _ := os.ReadFile(b.config)
+			b.keyboard = &keyboard{title: "输入 TVBox 订阅地址", value: []rune(strings.TrimSpace(string(raw))), submit: func(value string) error {
+				cfg, err := loadSubscription(value)
+				if err != nil {
+					return err
+				}
+				tmp := b.config + ".tmp"
+				if err := os.WriteFile(tmp, []byte(strings.TrimSpace(value)+"\n"), 0600); err != nil {
+					return errors.New("无法保存订阅地址，请检查 TF1")
+				}
+				if err := os.Rename(tmp, b.config); err != nil {
+					_ = os.Remove(tmp)
+					return errors.New("无法更新订阅地址")
+				}
+				b.showSubscription(cfg)
+				return nil
+			}}
+			return nil
+		}},
+		{label: "打开已保存的订阅", open: func() error {
+			raw, err := os.ReadFile(b.config)
+			if err != nil {
+				return errors.New("请先输入 TVBox 订阅地址")
+			}
+			return b.openSubscription(strings.TrimSpace(string(raw)))
+		}},
+	}}
+}
+
+func (b *browser) openSubscription(value string) error {
+	cfg, err := loadSubscription(value)
+	if err != nil {
+		return err
 	}
+	b.showSubscription(cfg)
+	return nil
 }
 
-func (b *browserState) draw(s *screen) {
-	fg := color{228, 240, 241, 255}
-	muted := color{151, 173, 185, 255}
-	accent := color{98, 231, 189, 255}
-	s.box(color{16, 26, 35, 255}, 0, 0, 720, 480)
-	s.text(s.heading, fg, 24, 12, 540, "续映 ContinueBox")
-	s.text(s.font, accent, 576, 25, 120, "muOS 预览版")
-	for i, section := range sections {
-		x := int32(24 + i*171)
-		tint := muted
-		if i == b.tab {
-			s.box(color{31, 71, 69, 255}, x, 65, 153, 36)
-			tint = accent
+func (b *browser) showSubscription(cfg subscription) {
+	v := &view{title: "订阅站点"}
+	if cfg.Skipped > 0 {
+		v.message = fmt.Sprintf("已略过 %d 个插件站或不兼容接口", cfg.Skipped)
+	}
+	for _, entry := range cfg.Links {
+		v.rows = append(v.rows, row{entry.Name, "子订阅", func() error {
+			return b.openSubscription(entry.URL)
+		}})
+	}
+	for _, source := range cfg.Sites {
+		v.rows = append(v.rows, row{source.Name, "站点", func() error { return b.openSite(source) }})
+	}
+	b.push(v)
+}
+
+func (b *browser) openSite(source site) error {
+	result, _, err := source.catalog(url.Values{})
+	if err != nil {
+		return err
+	}
+	v := &view{title: source.Name}
+	v.rows = append(v.rows, row{label: "搜索", open: func() error {
+		b.keyboard = &keyboard{title: "搜索当前站点", submit: func(value string) error {
+			if strings.TrimSpace(value) == "" {
+				return errors.New("请输入关键词")
+			}
+			return b.openList(source, "搜索结果", url.Values{"wd": {strings.TrimSpace(value)}})
+		}}
+		return nil
+	}})
+	for _, entry := range result.Categories {
+		if entry.ID != "" {
+			v.rows = append(v.rows, row{entry.Name, "分类", func() error {
+				return b.openList(source, entry.Name, url.Values{"t": {string(entry.ID)}})
+			}})
 		}
-		s.text(s.font, tint, x+10, 66, 143, section.title)
 	}
-	start := max(0, b.selected-visibleRows+1)
-	for index := start; index < min(len(b.Items), start+visibleRows); index++ {
-		item := b.Items[index]
-		y := int32(108 + (index-start)*43)
-		if index == b.selected {
+	v.rows = append(v.rows, b.movieRows(source, result.Items)...)
+	b.push(v)
+	return nil
+}
+
+func (b *browser) openList(source site, title string, params url.Values) error {
+	v := &view{title: title}
+	v.reload = func(page int) error {
+		params.Set("pg", strconv.Itoa(page))
+		result, _, err := source.catalog(params)
+		if err != nil {
+			return err
+		}
+		v.page, v.selected = page, 0
+		v.pages, _ = strconv.Atoi(string(result.Pages))
+		v.rows = b.movieRows(source, result.Items)
+		return nil
+	}
+	if err := v.reload(1); err != nil {
+		return err
+	}
+	b.push(v)
+	return nil
+}
+
+func (b *browser) movieRows(source site, items []media) []row {
+	rows := make([]row, 0, len(items))
+	for _, item := range items {
+		if item.ID == "" {
+			continue
+		}
+		rows = append(rows, row{item.Name, item.Note, func() error {
+			return b.openMovie(source, item)
+		}})
+	}
+	return rows
+}
+
+func (b *browser) openMovie(source site, item media) error {
+	result, base, err := source.catalog(url.Values{"ids": {string(item.ID)}})
+	if err != nil {
+		return err
+	}
+	var detail media
+	for _, candidate := range result.Items {
+		if candidate.ID == item.ID {
+			detail = candidate
+			break
+		}
+	}
+	if detail.ID == "" && len(result.Items) == 1 && result.Items[0].ID == "" {
+		detail = result.Items[0]
+	}
+	parts := episodes(detail)
+	if len(parts) == 0 {
+		return errors.New("没有可用分集")
+	}
+	v := &view{title: item.Name}
+	for _, ep := range parts {
+		v.rows = append(v.rows, row{ep.Name, ep.Flag, func() error {
+			address, err := source.playback(base, ep)
+			if err != nil {
+				return err
+			}
+			b.screen.close()
+			b.screen = nil
+			playerErr := exec.Command(wasabi, "--title", item.Name+" · "+ep.Name, address).Run()
+			b.screen, err = newScreen()
+			if err != nil {
+				b.screen = nil
+				return err
+			}
+			if playerErr != nil {
+				return errors.New("Wasabi 无法播放这条线路")
+			}
+			return nil
+		}})
+	}
+	b.push(v)
+	return nil
+}
+
+func (b *browser) draw() {
+	s := b.screen
+	v := b.current()
+	s.box(background, 0, 0, 720, 480)
+	s.text(s.heading, fg, 24, 12, 490, "续映 ContinueBox")
+	s.text(s.font, accent, 533, 23, 165, "TVBox 在线版")
+	s.text(s.font, muted, 24, 65, 672, v.title)
+	start := max(0, v.selected-visibleRows+1)
+	for i := start; i < min(len(v.rows), start+visibleRows); i++ {
+		r := v.rows[i]
+		y := int32(100 + (i-start)*43)
+		if i == v.selected {
 			s.box(color{35, 60, 74, 255}, 24, y, 672, 42)
 			s.box(accent, 24, y, 4, 42)
 		}
-		label := item.label()
-		note := item.Note
-		if b.showEpisodes {
-			label, note = item.Subtitle, ""
-		}
-		s.text(s.font, fg, 38, y+4, 520, label)
-		s.text(s.font, muted, 563, y+4, 125, note)
+		s.text(s.font, fg, 38, y+4, 490, r.label)
+		s.text(s.font, muted, 536, y+4, 150, r.note)
 	}
-	message := b.message
-	if message == "" && len(b.Items) == 0 {
-		message = "这个列表暂无内容 · 左右切换栏目"
-	} else if message == "" && b.showEpisodes {
-		message = fmt.Sprintf("选集  %d / %d", b.selected+1, len(b.Items))
-	} else if message == "" {
-		message = fmt.Sprintf("第 %d 页 · L/R 翻页", b.page+1)
+	message := v.message
+	if message == "" {
+		switch {
+		case len(v.rows) == 0:
+			message = "暂无内容"
+		case v.pages > 0:
+			message = fmt.Sprintf("第 %d / %d 页    L/R 翻页", v.page, v.pages)
+		default:
+			message = fmt.Sprintf("%d / %d", v.selected+1, len(v.rows))
+		}
 	}
 	s.text(s.font, accent, 24, 414, 672, message)
 	s.text(s.font, muted, 24, 447, 672, "方向键 浏览     A 确定     B 返回")
 	s.present(s.renderer)
 }
 
+type keyboard struct {
+	title   string
+	value   []rune
+	index   int
+	shift   bool
+	message string
+	submit  func(string) error
+}
+
+const keys = "abcdefghijklmnopqrstuvwxyz0123456789:/.-_?&=%#+~@![](),;$'|"
+const keyboardColumns = 10
+
+func (k *keyboard) draw(s *screen) {
+	s.box(background, 0, 0, 720, 480)
+	s.text(s.heading, fg, 24, 12, 672, k.title)
+	s.box(color{35, 60, 74, 255}, 23, 64, 674, 46)
+	visible := k.value[max(0, len(k.value)-43):]
+	s.text(s.font, fg, 36, 70, 644, string(visible)+"_")
+	for i, key := range keys {
+		x, y := int32(24+(i%keyboardColumns)*67), int32(126+(i/keyboardColumns)*41)
+		fill, ink := color{29, 44, 55, 255}, fg
+		if i == k.index {
+			fill, ink = accent, background
+		}
+		s.box(fill, x, y, 63, 37)
+		label := string(key)
+		if k.shift {
+			label = strings.ToUpper(label)
+		}
+		s.text(s.font, ink, x+21, y+2, 29, label)
+	}
+	s.text(s.font, accent, 24, 408, 672, k.message)
+	s.text(s.font, muted, 24, 448, 672, "A 输入   X 空格   L 删除   R 大小写   START 提交   B 取消")
+	s.present(s.renderer)
+}
+
+func (b *browser) edit(action string) {
+	k := b.keyboard
+	switch action {
+	case "up":
+		k.index = max(0, k.index-keyboardColumns)
+	case "down":
+		k.index = min(len(keys)-1, k.index+keyboardColumns)
+	case "prev":
+		k.index = (k.index + len(keys) - 1) % len(keys)
+	case "next":
+		k.index = (k.index + 1) % len(keys)
+	case "page-prev":
+		if len(k.value) > 0 {
+			k.value = k.value[:len(k.value)-1]
+		}
+	case "page-next":
+		k.shift = !k.shift
+	case "select":
+		if len(k.value) < 4096 {
+			value := string(keys[k.index])
+			if k.shift {
+				value = strings.ToUpper(value)
+			}
+			k.value = append(k.value, []rune(value)...)
+		}
+	case "space":
+		if len(k.value) < 4096 {
+			k.value = append(k.value, ' ')
+		}
+	case "back":
+		b.keyboard = nil
+	case "submit":
+		k.message = "正在连接…"
+		k.draw(b.screen)
+		if err := k.submit(string(k.value)); err != nil {
+			k.message = err.Error()
+		} else {
+			b.keyboard = nil
+		}
+	}
+}
+
 func runDevice() error {
 	if len(os.Args) != 2 {
-		return errors.New("需要 TF 卡配置文件路径")
+		return errors.New("需要 TF 卡订阅文件路径")
 	}
-	s, err := newScreen()
+	screen, err := newScreen()
 	if err != nil {
 		return err
 	}
+	b := &browser{screen: screen, config: os.Args[1]}
 	defer func() {
-		if s != nil {
-			s.close()
+		if b.screen != nil {
+			b.screen.close()
 		}
 	}()
-	b := browserState{}
-	raw, err := os.ReadFile(os.Args[1])
-	var cfg settings
-	if err != nil || json.Unmarshal(raw, &cfg) != nil || cfg.Token == "" {
-		b.message = "请先运行 Windows 配置工具，将配置复制到 TF1 根目录"
-		b.draw(s)
-		for {
-			switch s.action() {
-			case "back", "quit":
-				return nil
-			}
+	b.push(b.home())
+	if raw, err := os.ReadFile(b.config); err == nil {
+		b.current().message = "正在读取订阅…"
+		b.draw()
+		b.current().message = ""
+		if err = b.openSubscription(string(raw)); err != nil {
+			b.current().message = err.Error()
 		}
 	}
-	c, err := connect(cfg)
-	if err != nil {
-		return err
-	}
-	b.message = "正在读取片库…"
-	b.draw(s)
-	b.load(c)
 	for {
-		b.draw(s)
-		for action := ""; ; {
-			action = s.action()
-			if action == "" {
+		if b.keyboard != nil {
+			b.keyboard.draw(b.screen)
+		} else {
+			b.draw()
+		}
+		action := b.screen.action()
+		for action == "" {
+			action = b.screen.action()
+		}
+		if action == "quit" {
+			return nil
+		}
+		if b.keyboard != nil {
+			b.edit(action)
+			continue
+		}
+		v := b.current()
+		switch action {
+		case "back":
+			if len(b.stack) == 1 {
+				return nil
+			}
+			b.stack = b.stack[:len(b.stack)-1]
+		case "up":
+			v.selected = max(0, v.selected-1)
+		case "down":
+			v.selected = max(0, min(len(v.rows)-1, v.selected+1))
+		case "page-prev", "page-next":
+			if v.reload == nil {
 				continue
 			}
-			switch action {
-			case "quit":
-				return nil
-			case "back":
-				if !b.showEpisodes {
-					return nil
-				}
-				b.catalog, b.selected, b.showEpisodes = b.parentCatalog, b.parentSelection, false
-				b.message = ""
-			case "up":
-				b.selected = max(0, b.selected-1)
-			case "down":
-				b.selected = max(0, min(len(b.Items)-1, b.selected+1))
-			case "prev", "next", "page-prev", "page-next":
-				if b.showEpisodes {
-					break
-				}
-				switch action {
-				case "prev":
-					b.tab, b.page = (b.tab+len(sections)-1)%len(sections), 0
-				case "next":
-					b.tab, b.page = (b.tab+1)%len(sections), 0
-				case "page-prev":
-					b.page = max(0, b.page-1)
-				case "page-next":
-					if (b.page+1)*pageSize >= b.Total || sections[b.tab].key == "latest" {
-						break
-					}
-					b.page++
-				}
-				b.message = "正在加载…"
-				b.draw(s)
-				b.load(c)
-			case "select":
-				if len(b.Items) == 0 {
-					break
-				}
-				item := b.Items[b.selected]
-				if item.Type == "Series" {
-					rows, err := c.episodes(item)
-					if err != nil {
-						b.message = err.Error()
-					} else if len(rows) == 0 {
-						b.message = "未找到分集"
-					} else {
-						b.parentCatalog, b.parentSelection = b.catalog, b.selected
-						b.catalog, b.selected = catalog{Items: rows, Total: len(rows)}, 0
-						b.showEpisodes, b.message = true, ""
-					}
-					break
-				}
-				b.message = "正在获取播放地址…"
-				b.draw(s)
-				stream, err := c.stream(item)
-				if err != nil {
-					b.message = err.Error()
-					break
-				}
-				s.close()
-				s = nil
-				b.message = c.play(item, stream)
-				s, err = newScreen()
-				if err != nil {
-					s = nil
+			page := v.page + 1
+			if action == "page-prev" {
+				page = v.page - 1
+			}
+			if page < 1 || page > v.pages {
+				continue
+			}
+			v.message = "正在加载…"
+			b.draw()
+			v.message = ""
+			if err := v.reload(page); err != nil {
+				v.message = err.Error()
+			}
+		case "select":
+			if len(v.rows) == 0 {
+				continue
+			}
+			v.message = "正在加载…"
+			b.draw()
+			v.message = ""
+			if err := v.rows[v.selected].open(); err != nil {
+				if b.screen == nil {
 					return err
 				}
-			}
-			break
-		}
-	}
-}
-
-type playbackState struct {
-	URI      string  `json:"uri"`
-	Position float64 `json:"position"`
-	Duration float64 `json:"duration"`
-	Seek     int     `json:"seek"`
-	Updated  int64   `json:"updated"`
-}
-
-func (c *client) stream(item media) (string, error) {
-	var source struct {
-		URL string `json:"url"`
-	}
-	err := c.call("GET", "/api/v1/emby/play/"+url.PathEscape(item.ID), nil, &source)
-	if err != nil {
-		return "", err
-	}
-	u, err := url.Parse(source.URL)
-	base, _ := url.Parse(c.Server)
-	if err != nil || u.Host == "" || u.User != nil || u.Scheme != base.Scheme || u.Host != base.Host {
-		return "", errors.New("服务器返回的播放地址与已配置的服务地址不一致")
-	}
-	return source.URL, nil
-}
-
-func (c *client) report(item media, state playbackState, event string) error {
-	mediaType := "movie"
-	var season, episode int
-	if item.Type == "Episode" {
-		mediaType = "episode"
-		_, _ = fmt.Sscanf(item.Note, "S%dE%d", &season, &episode)
-	}
-	body := map[string]any{
-		"event": event, "title": item.Name, "media_type": mediaType, "emby_item_id": item.ID,
-		"season": season, "episode": episode, "position_ms": int64(state.Position * 1000),
-		"duration_ms": int64(state.Duration * 1000),
-	}
-	var result struct {
-		Integrations struct {
-			Emby struct {
-				Reported bool `json:"reported"`
-			} `json:"emby"`
-		} `json:"integrations"`
-	}
-	if err := c.call("POST", "/api/v1/playback/event", body, &result); err != nil {
-		return err
-	}
-	if !result.Integrations.Emby.Reported {
-		return errors.New("Emby 未确认收到进度")
-	}
-	return nil
-}
-
-func (c *client) resume(item media) int64 {
-	var status struct {
-		Available bool  `json:"available"`
-		Position  int64 `json:"position_ms"`
-		Played    bool  `json:"played"`
-	}
-	mediaType := "movie"
-	if item.Type == "Episode" {
-		mediaType = "episode"
-	}
-	if c.call("POST", "/api/v1/emby/resume", map[string]any{
-		"title": item.Name, "media_type": mediaType, "emby_item_id": item.ID,
-	}, &status) == nil && status.Available {
-		if status.Played {
-			return 0
-		}
-		return status.Position
-	}
-	return item.Position
-}
-
-func seek(seconds float64) bool {
-	info, err := os.Lstat(controlFile)
-	if err != nil || info.Mode()&os.ModeNamedPipe == 0 {
-		return false
-	}
-	pipe, err := os.OpenFile(controlFile, os.O_WRONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
-	if err != nil {
-		return false
-	}
-	defer pipe.Close()
-	_, err = fmt.Fprintln(pipe, "seek "+strconv.FormatFloat(seconds, 'f', 3, 64))
-	return err == nil
-}
-
-func (c *client) play(item media, stream string) string {
-	resumeAt := float64(c.resume(item)) / 1000
-	player := exec.Command(wasabi, "--title", item.label(), stream)
-	start := time.Now()
-	if err := player.Start(); err != nil {
-		return "无法启动 Wasabi"
-	}
-	finished := make(chan error, 1)
-	go func() { finished <- player.Wait() }()
-	poll := time.NewTicker(500 * time.Millisecond)
-	defer poll.Stop()
-	var last playbackState
-	var reported time.Time
-	seekRequested := false
-	for {
-		select {
-		case err := <-finished:
-			if last.Duration == 0 {
-				if err != nil {
-					return "Wasabi 播放失败"
-				}
-				return "没有可同步的进度，或 Wasabi 未报告播放状态"
-			}
-			if c.report(item, last, "stop") != nil {
-				return "已退出播放，Emby 进度同步失败"
-			}
-			return "已同步播放进度"
-		case <-poll.C:
-			data, err := os.ReadFile(stateFile)
-			var state playbackState
-			if err != nil || json.Unmarshal(data, &state) != nil || state.URI != stream ||
-				state.Updated < start.Unix() || state.Duration < 1 || state.Position < 0 {
-				continue
-			}
-			if resumeAt > 3 && resumeAt < state.Duration-2 && last.Duration == 0 {
-				if state.Position < resumeAt-3 {
-					if !seekRequested && state.Seek != 0 {
-						seekRequested = seek(resumeAt)
-					}
-					continue
-				}
-			}
-			last = state
-			if time.Since(reported) >= 30*time.Second {
-				event := "progress"
-				if reported.IsZero() {
-					event = "start"
-				}
-				reported = time.Now()
-				_ = c.report(item, state, event)
+				v.message = err.Error()
 			}
 		}
 	}
