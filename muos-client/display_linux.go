@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"image"
 	"runtime"
 	"unsafe"
 
@@ -23,6 +24,8 @@ type screen struct {
 	paintText                                           func(uintptr, string, uint32) uintptr
 	freeSurface, destroyTexture                         func(uintptr)
 	createTexture                                       func(uintptr, uintptr) uintptr
+	createRawTexture                                    func(uintptr, uint32, int32, int32, int32) uintptr
+	updateTexture                                       func(uintptr, *rectangle, unsafe.Pointer, int32) int32
 	queryTexture                                        func(uintptr, uintptr, uintptr, *int32, *int32) int32
 	copyTexture                                         func(uintptr, uintptr, *rectangle, *rectangle) int32
 	wait                                                func(unsafe.Pointer, int32) int32
@@ -61,6 +64,7 @@ func newScreen() (s *screen, err error) {
 		"SDL_SetRenderDrawColor": &s.setColor, "SDL_RenderClear": &s.clear,
 		"SDL_RenderFillRect": &s.fill, "SDL_RenderPresent": &s.present,
 		"SDL_FreeSurface": &s.freeSurface, "SDL_CreateTextureFromSurface": &s.createTexture,
+		"SDL_CreateTexture": &s.createRawTexture, "SDL_UpdateTexture": &s.updateTexture,
 		"SDL_QueryTexture": &s.queryTexture, "SDL_RenderCopy": &s.copyTexture,
 		"SDL_DestroyTexture": &s.destroyTexture, "SDL_WaitEventTimeout": &s.wait,
 		"SDL_NumJoysticks": &countPads, "SDL_GameControllerOpen": &openPad,
@@ -96,6 +100,23 @@ func newScreen() (s *screen, err error) {
 		}
 	}
 	return s, nil
+}
+
+func (s *screen) picture(img *image.RGBA, x, y int32) {
+	if img == nil || len(img.Pix) == 0 {
+		return
+	}
+	width, height := int32(img.Rect.Dx()), int32(img.Rect.Dy())
+	// SDL_PIXELFORMAT_RGBA32 is ABGR8888 on the little-endian H700.
+	texture := s.createRawTexture(s.renderer, 0x16762004, 0, width, height)
+	if texture == 0 {
+		return
+	}
+	defer s.destroyTexture(texture)
+	if s.updateTexture(texture, nil, unsafe.Pointer(&img.Pix[0]), int32(img.Stride)) == 0 {
+		s.copyTexture(s.renderer, texture, nil, &rectangle{x, y, width, height})
+	}
+	runtime.KeepAlive(img)
 }
 
 func (s *screen) close() {

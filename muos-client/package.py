@@ -61,7 +61,7 @@ def main():
     go = sys.argv[2] if len(sys.argv) == 3 else "go"
     out.mkdir(parents=True, exist_ok=True)
     setup = out / "ContinueBox-TVBox-Setup.exe"
-    archive = out / "ContinueBox-muOS-0.2.0-TVBox-preview.muxapp"
+    archive = out / "ContinueBox-muOS-0.3.0-TVBox-preview.muxapp"
     with tempfile.TemporaryDirectory() as temporary:
         stage = Path(temporary)
         binary = stage / "continuebox"

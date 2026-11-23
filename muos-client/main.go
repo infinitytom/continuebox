@@ -44,10 +44,11 @@ func (f *field) UnmarshalJSON(data []byte) error {
 }
 
 type site struct {
-	Name string          `json:"name"`
-	Kind field           `json:"type"`
-	API  string          `json:"api"`
-	Ext  json.RawMessage `json:"ext"`
+	Name       string          `json:"name"`
+	Kind       field           `json:"type"`
+	API        string          `json:"api"`
+	Ext        json.RawMessage `json:"ext"`
+	Searchable field           `json:"searchable"`
 }
 
 type subscriptionLink struct {
@@ -67,11 +68,12 @@ type category struct {
 }
 
 type media struct {
-	ID    field  `json:"vod_id"`
-	Name  string `json:"vod_name"`
-	Note  string `json:"vod_remarks"`
-	From  string `json:"vod_play_from"`
-	Links string `json:"vod_play_url"`
+	ID      field  `json:"vod_id"`
+	Name    string `json:"vod_name"`
+	Note    string `json:"vod_remarks"`
+	From    string `json:"vod_play_from"`
+	Links   string `json:"vod_play_url"`
+	Picture string `json:"vod_pic"`
 }
 
 type catalog struct {
@@ -262,6 +264,14 @@ func (s site) catalog(params url.Values) (catalog, *url.URL, error) {
 	if err != nil || (result.Items == nil && result.Categories == nil && result.Pages == "") {
 		return catalog{}, nil, errors.New("站点没有返回可识别的影视列表")
 	}
+	for i := range result.Items {
+		item := &result.Items[i]
+		if cover, err := resolve(base, item.Picture); err == nil {
+			item.Picture = cover.String()
+		} else {
+			item.Picture = ""
+		}
+	}
 	return result, base, nil
 }
 
@@ -275,10 +285,11 @@ func readXML(body []byte) (catalog, error) {
 		List struct {
 			Pages  string `xml:"pagecount,attr"`
 			Videos []struct {
-				ID    string `xml:"id"`
-				Name  string `xml:"name"`
-				Note  string `xml:"note"`
-				Lines []struct {
+				ID      string `xml:"id"`
+				Name    string `xml:"name"`
+				Note    string `xml:"note"`
+				Picture string `xml:"pic"`
+				Lines   []struct {
 					Flag  string `xml:"flag,attr"`
 					Links string `xml:",chardata"`
 				} `xml:"dl>dd"`
@@ -298,7 +309,10 @@ func readXML(body []byte) (catalog, error) {
 			flags = append(flags, line.Flag)
 			links = append(links, line.Links)
 		}
-		result.Items = append(result.Items, media{field(entry.ID), entry.Name, entry.Note, strings.Join(flags, "$$$"), strings.Join(links, "$$$")})
+		result.Items = append(result.Items, media{
+			ID: field(entry.ID), Name: entry.Name, Note: entry.Note, Picture: entry.Picture,
+			From: strings.Join(flags, "$$$"), Links: strings.Join(links, "$$$"),
+		})
 	}
 	return result, nil
 }
@@ -324,8 +338,15 @@ func episodes(item media) []episode {
 	return result
 }
 
-func (s site) playback(base *url.URL, ep episode) (string, error) {
+type playbackStream struct {
+	url       string
+	extension string
+	headers   http.Header
+}
+
+func (s site) resolvePlayback(base *url.URL, ep episode) (playbackStream, error) {
 	link := ep.Link
+	var headers http.Header
 	if s.Kind == "4" {
 		var reply struct {
 			URL    string          `json:"url"`
@@ -335,51 +356,58 @@ func (s site) playback(base *url.URL, ep episode) (string, error) {
 		}
 		raw, effective, err := s.request(url.Values{"play": {ep.Link}, "flag": {ep.Flag}})
 		if err != nil {
-			return "", err
+			return playbackStream{}, err
 		}
 		if json.Unmarshal(raw, &reply) != nil {
-			return "", errors.New("远程站点未返回有效播放地址")
+			return playbackStream{}, errors.New("远程站点未返回有效播放地址")
 		}
 		if reply.Parse != "" && reply.Parse != "0" || reply.JX != "" && reply.JX != "0" {
-			return "", errors.New("这条线路需要网页解析，请换一条直连线路")
+			return playbackStream{}, errors.New("这条线路需要网页解析，请换一条直连线路")
 		}
-		switch strings.TrimSpace(string(reply.Header)) {
-		case "", "null", "{}", `""`, `"{}"`:
-		default:
-			return "", errors.New("这一线路要求自定义播放请求头，请换一条直连线路")
+		headers, err = playbackHeaders(reply.Header)
+		if err != nil {
+			return playbackStream{}, err
 		}
 		link, base = reply.URL, effective
 	}
 	stream, err := resolve(base, link)
 	if err != nil {
-		return "", errors.New("该线路没有 HTTP 视频地址")
+		return playbackStream{}, errors.New("该线路没有 HTTP 视频地址")
 	}
-	switch strings.ToLower(path.Ext(stream.Path)) {
+	extension := strings.ToLower(path.Ext(stream.Path))
+	switch extension {
 	case ".mp4", ".m3u8", ".mkv", ".webm", ".ts", ".mov", ".flv", ".m4v", ".avi", ".m3u":
-		return stream.String(), nil
+		return playbackStream{stream.String(), extension, headers}, nil
 	}
 	req, err := http.NewRequest("GET", stream.String(), nil)
 	if err != nil {
-		return "", errors.New("播放地址无效")
+		return playbackStream{}, errors.New("播放地址无效")
+	}
+	if headers != nil {
+		req.Header = headers.Clone()
 	}
 	req.Header.Set("Range", "bytes=0-511")
 	res, err := network.Do(req)
 	if err != nil {
-		return "", errors.New("无法连接视频地址")
+		return playbackStream{}, errors.New("无法连接视频地址")
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusPartialContent {
-		return "", fmt.Errorf("视频地址返回 HTTP %d", res.StatusCode)
+		return playbackStream{}, fmt.Errorf("视频地址返回 HTTP %d", res.StatusCode)
 	}
 	mime := strings.ToLower(res.Header.Get("Content-Type"))
-	if strings.HasPrefix(mime, "video/") || strings.Contains(mime, "mpegurl") {
-		return res.Request.URL.String(), nil
-	}
 	sample, _ := io.ReadAll(io.LimitReader(res.Body, 512))
-	if bytes.HasPrefix(bytes.TrimSpace(sample), []byte("#EXTM3U")) || len(sample) >= 8 && string(sample[4:8]) == "ftyp" {
-		return res.Request.URL.String(), nil
+	switch {
+	case strings.Contains(mime, "mpegurl"), bytes.HasPrefix(bytes.TrimSpace(sample), []byte("#EXTM3U")):
+		extension = ".m3u8"
+	case strings.HasPrefix(mime, "video/mp4"), len(sample) >= 8 && string(sample[4:8]) == "ftyp":
+		extension = ".mp4"
+	case strings.HasPrefix(mime, "video/"):
+		extension = ""
+	default:
+		return playbackStream{}, errors.New("这条线路没有返回可直接播放的视频")
 	}
-	return "", errors.New("这条线路没有返回可直接播放的视频")
+	return playbackStream{res.Request.URL.String(), extension, headers}, nil
 }
 
 func setup() error {

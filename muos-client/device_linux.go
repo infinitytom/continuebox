@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"image"
 	"net/url"
 	"os"
 	"os/exec"
@@ -25,6 +26,7 @@ var (
 type row struct {
 	label, note string
 	open        func() error
+	cover       string
 }
 
 type view struct {
@@ -33,13 +35,17 @@ type view struct {
 	selected, page, pages int
 	reload                func(int) error
 	message               string
+	thumbnails            bool
 }
 
 type browser struct {
-	screen   *screen
-	config   string
-	stack    []*view
-	keyboard *keyboard
+	screen       *screen
+	config       string
+	stack        []*view
+	keyboard     *keyboard
+	covers       map[string]*image.RGBA
+	coverQueue   chan coverResult
+	coverLoading int
 }
 
 func (b *browser) current() *view  { return b.stack[len(b.stack)-1] }
@@ -91,13 +97,21 @@ func (b *browser) showSubscription(cfg subscription) {
 	if cfg.Skipped > 0 {
 		v.message = fmt.Sprintf("已略过 %d 个插件站或不兼容接口", cfg.Skipped)
 	}
+	if len(cfg.Sites) > 0 {
+		v.rows = append(v.rows, row{label: "搜索多个站点", open: func() error {
+			b.searchKeyboard("搜索当前订阅", func(query string) error {
+				return b.openSearch(cfg.Sites, query)
+			})
+			return nil
+		}})
+	}
 	for _, entry := range cfg.Links {
-		v.rows = append(v.rows, row{entry.Name, "子订阅", func() error {
+		v.rows = append(v.rows, row{label: entry.Name, note: "子订阅", open: func() error {
 			return b.openSubscription(entry.URL)
 		}})
 	}
 	for _, source := range cfg.Sites {
-		v.rows = append(v.rows, row{source.Name, "站点", func() error { return b.openSite(source) }})
+		v.rows = append(v.rows, row{label: source.Name, note: "站点", open: func() error { return b.openSite(source) }})
 	}
 	b.push(v)
 }
@@ -108,29 +122,29 @@ func (b *browser) openSite(source site) error {
 		return err
 	}
 	v := &view{title: source.Name}
-	v.rows = append(v.rows, row{label: "搜索", open: func() error {
-		b.keyboard = &keyboard{title: "搜索当前站点", submit: func(value string) error {
-			if strings.TrimSpace(value) == "" {
-				return errors.New("请输入关键词")
-			}
-			return b.openList(source, "搜索结果", url.Values{"wd": {strings.TrimSpace(value)}})
-		}}
-		return nil
-	}})
+	if source.Searchable != "0" {
+		v.rows = append(v.rows, row{label: "搜索当前站点", open: func() error {
+			b.searchKeyboard("搜索 "+source.Name, func(query string) error {
+				return b.openList(source, "搜索  "+query, url.Values{"wd": {query}})
+			})
+			return nil
+		}})
+	}
 	for _, entry := range result.Categories {
 		if entry.ID != "" {
-			v.rows = append(v.rows, row{entry.Name, "分类", func() error {
+			v.rows = append(v.rows, row{label: entry.Name, note: "分类", open: func() error {
 				return b.openList(source, entry.Name, url.Values{"t": {string(entry.ID)}})
 			}})
 		}
 	}
+	v.thumbnails = len(result.Items) > 0
 	v.rows = append(v.rows, b.movieRows(source, result.Items)...)
 	b.push(v)
 	return nil
 }
 
 func (b *browser) openList(source site, title string, params url.Values) error {
-	v := &view{title: title}
+	v := &view{title: title, thumbnails: true}
 	v.reload = func(page int) error {
 		params.Set("pg", strconv.Itoa(page))
 		result, _, err := source.catalog(params)
@@ -155,7 +169,7 @@ func (b *browser) movieRows(source site, items []media) []row {
 		if item.ID == "" {
 			continue
 		}
-		rows = append(rows, row{item.Name, item.Note, func() error {
+		rows = append(rows, row{label: item.Name, note: item.Note, cover: item.Picture, open: func() error {
 			return b.openMovie(source, item)
 		}})
 	}
@@ -164,9 +178,6 @@ func (b *browser) movieRows(source site, items []media) []row {
 
 func (b *browser) openMovie(source site, item media) error {
 	result, base, err := source.catalog(url.Values{"ids": {string(item.ID)}})
-	if err != nil {
-		return err
-	}
 	var detail media
 	for _, candidate := range result.Items {
 		if candidate.ID == item.ID {
@@ -179,12 +190,26 @@ func (b *browser) openMovie(source site, item media) error {
 	}
 	parts := episodes(detail)
 	if len(parts) == 0 {
+		parts = episodes(item)
+	}
+	if len(parts) == 0 && err != nil {
+		return err
+	}
+	if len(parts) == 0 {
 		return errors.New("没有可用分集")
 	}
 	v := &view{title: item.Name}
 	for _, ep := range parts {
-		v.rows = append(v.rows, row{ep.Name, ep.Flag, func() error {
-			address, err := source.playback(base, ep)
+		v.rows = append(v.rows, row{label: ep.Name, note: ep.Flag, open: func() error {
+			if base == nil {
+				base, _ = url.Parse(source.API)
+			}
+			stream, err := source.resolvePlayback(base, ep)
+			if err != nil {
+				return err
+			}
+			address, cleanup, err := stream.playerAddress()
+			defer cleanup()
 			if err != nil {
 				return err
 			}
@@ -213,16 +238,41 @@ func (b *browser) draw() {
 	s.text(s.heading, fg, 24, 12, 490, "续映 ContinueBox")
 	s.text(s.font, accent, 533, 23, 165, "TVBox 在线版")
 	s.text(s.font, muted, 24, 65, 672, v.title)
-	start := max(0, v.selected-visibleRows+1)
-	for i := start; i < min(len(v.rows), start+visibleRows); i++ {
-		r := v.rows[i]
-		y := int32(100 + (i-start)*43)
-		if i == v.selected {
-			s.box(color{35, 60, 74, 255}, 24, y, 672, 42)
-			s.box(accent, 24, y, 4, 42)
+	count, height := visibleRows, int32(43)
+	if v.thumbnails {
+		count, height = 5, 61
+		b.collectCovers()
+		if b.coverLoading == 0 && len(b.covers) >= 50 {
+			clear(b.covers)
 		}
-		s.text(s.font, fg, 38, y+4, 490, r.label)
-		s.text(s.font, muted, 536, y+4, 150, r.note)
+	}
+	start := max(0, v.selected-count+1)
+	for i := start; i < min(len(v.rows), start+count); i++ {
+		r := v.rows[i]
+		y := 100 + int32(i-start)*height
+		if i == v.selected {
+			s.box(color{35, 60, 74, 255}, 24, y, 672, height-1)
+			s.box(accent, 24, y, 4, height-1)
+		}
+		if v.thumbnails {
+			s.box(color{29, 44, 55, 255}, 38, y+4, 40, 52)
+			if r.cover != "" {
+				if cover, ok := b.covers[r.cover]; ok {
+					s.picture(cover, 38, y+4)
+				} else if b.coverLoading < cap(b.coverQueue) {
+					b.covers[r.cover] = nil
+					b.coverLoading++
+					go func(address string) {
+						b.coverQueue <- coverResult{address, fetchCover(address)}
+					}(r.cover)
+				}
+			}
+			s.text(s.font, fg, 89, y+1, 595, r.label)
+			s.text(s.font, muted, 89, y+29, 595, r.note)
+		} else {
+			s.text(s.font, fg, 38, y+4, 490, r.label)
+			s.text(s.font, muted, 536, y+4, 150, r.note)
+		}
 	}
 	message := v.message
 	if message == "" {
@@ -245,6 +295,7 @@ type keyboard struct {
 	value   []rune
 	index   int
 	shift   bool
+	search  bool
 	message string
 	submit  func(string) error
 }
@@ -271,7 +322,11 @@ func (k *keyboard) draw(s *screen) {
 		}
 		s.text(s.font, ink, x+21, y+2, 29, label)
 	}
-	s.text(s.font, accent, 24, 408, 672, k.message)
+	if k.search && k.message == "" {
+		s.text(s.font, muted, 24, 408, 672, "可从 TF1 的 continuebox-search.txt 读取中文搜索词")
+	} else {
+		s.text(s.font, accent, 24, 408, 672, k.message)
+	}
 	s.text(s.font, muted, 24, 448, 672, "A 输入   X 空格   L 删除   R 大小写   START 提交   B 取消")
 	s.present(s.renderer)
 }
@@ -326,7 +381,7 @@ func runDevice() error {
 	if err != nil {
 		return err
 	}
-	b := &browser{screen: screen, config: os.Args[1]}
+	b := &browser{screen: screen, config: os.Args[1], covers: make(map[string]*image.RGBA), coverQueue: make(chan coverResult, 3)}
 	defer func() {
 		if b.screen != nil {
 			b.screen.close()
@@ -349,6 +404,9 @@ func runDevice() error {
 		}
 		action := b.screen.action()
 		for action == "" {
+			if b.collectCovers() && b.keyboard == nil {
+				b.draw()
+			}
 			action = b.screen.action()
 		}
 		if action == "quit" {

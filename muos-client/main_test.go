@@ -67,15 +67,15 @@ func TestTVBoxSubscriptionToPlayback(t *testing.T) {
 	if len(parts) != 3 || parts[2].Flag != "Other" {
 		t.Fatalf("episodes: %+v", parts)
 	}
-	stream, err := s.playback(base, parts[0])
-	if err != nil || stream != server.URL+"/video.m3u8" {
-		t.Fatalf("play: %q, %v", stream, err)
+	stream, err := s.resolvePlayback(base, parts[0])
+	if err != nil || stream.url != server.URL+"/video.m3u8" {
+		t.Fatalf("play: %+v, %v", stream, err)
 	}
 }
 
 func TestXMLCatalog(t *testing.T) {
-	c, err := readXML([]byte(`<?xml version="1.0"?><rss><class><ty id="1">电视剧</ty></class><list pagecount="3"><video><id>1</id><name>测试</name><dl><dd flag="cdn"><![CDATA[正片$https://example.org/sample.mp4]]></dd></dl></video></list></rss>`))
-	if err != nil || c.Pages != "3" || len(c.Items) != 1 || len(c.Categories) != 1 {
+	c, err := readXML([]byte(`<?xml version="1.0"?><rss><class><ty id="1">电视剧</ty></class><list pagecount="3"><video><id>1</id><name>测试</name><pic>/covers/1.jpg</pic><dl><dd flag="cdn"><![CDATA[正片$https://example.org/sample.mp4]]></dd></dl></video></list></rss>`))
+	if err != nil || c.Pages != "3" || len(c.Items) != 1 || len(c.Categories) != 1 || c.Items[0].Picture != "/covers/1.jpg" {
 		t.Fatalf("XML: %+v, %v", c, err)
 	}
 	if parts := episodes(c.Items[0]); len(parts) != 1 || parts[0].Flag != "cdn" {
@@ -105,11 +105,11 @@ func TestRemotePlaybackAndMediaProbe(t *testing.T) {
 	server := httptest.NewServer(router)
 	defer server.Close()
 	s := site{API: server.URL + "/vod", Kind: "4", Ext: []byte(`"test"`)}
-	stream, err := s.playback(nil, episode{Link: "opaque", Flag: "cdn"})
-	if err != nil || stream != server.URL+"/stream" {
-		t.Fatalf("play: %q, %v", stream, err)
+	stream, err := s.resolvePlayback(nil, episode{Link: "opaque", Flag: "cdn"})
+	if err != nil || stream.url != server.URL+"/stream" {
+		t.Fatalf("play: %+v, %v", stream, err)
 	}
-	if _, err = s.playback(nil, episode{Link: "needs-parse", Flag: "cdn"}); err == nil || !strings.Contains(err.Error(), "网页解析") {
+	if _, err = s.resolvePlayback(nil, episode{Link: "needs-parse", Flag: "cdn"}); err == nil || !strings.Contains(err.Error(), "网页解析") {
 		t.Fatalf("parse: %v", err)
 	}
 }
